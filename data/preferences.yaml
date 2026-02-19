@@ -1,0 +1,26 @@
+behavior:
+    welcomed: true
+    aside_width: 300
+    window_width: 1024
+    window_height: 768
+    window_maximised: false
+    window_pos_x: 0
+    window_pos_y: 0
+general:
+    theme: auto
+    language: auto
+    font_size: 14
+    scan_size: 3000
+    key_icon_style: 0
+    check_update: true
+    allow_track: true
+editor:
+    font_size: 14
+    show_line_num: true
+    show_folding: true
+    drop_text: true
+    links: true
+    entry_text_align: 0
+cli:
+    font_size: 14
+    cursor_style: block

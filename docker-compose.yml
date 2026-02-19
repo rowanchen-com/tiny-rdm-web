@@ -1,0 +1,17 @@
+services:
+  tinyrdm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: tinyrdm
+    container_name: tinyrdm
+    ports:
+      - "8088:8088"
+    environment:
+      - PORT=8088
+      - GIN_MODE=release
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=changeme
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/TinyRDM

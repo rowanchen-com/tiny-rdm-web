@@ -1,0 +1,9 @@
+node_modules
+frontend/node_modules
+frontend/dist
+.git
+.github
+*.md
+build/
+docs/
+redis-commander-*
