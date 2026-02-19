@@ -3,7 +3,7 @@
  * Replaces Wails desktop runtime functions with browser equivalents.
  */
 
-import { connectWebSocket, onWsEvent, offWsEvent, sendWsMessage } from '@/utils/websocket.js'
+import { connectWebSocket, reconnectWebSocket, waitForWebSocket, onWsEvent, offWsEvent, sendWsMessage } from '@/utils/websocket.js'
 
 // Initialize WebSocket connection
 connectWebSocket()
@@ -82,3 +82,8 @@ export async function Environment() {
         arch: 'web',
     }
 }
+
+// ==================== WebSocket Management ====================
+
+export { reconnectWebSocket as ReconnectWebSocket }
+export { waitForWebSocket as WaitForWebSocket }

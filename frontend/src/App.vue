@@ -14,7 +14,7 @@ import useConnectionStore from './stores/connections.js'
 import { useI18n } from 'vue-i18n'
 import { darkTheme, NButton, NSpace } from 'naive-ui'
 import KeyFilterDialog from './components/dialogs/KeyFilterDialog.vue'
-import { Environment, WindowSetDarkTheme, WindowSetLightTheme } from 'wailsjs/runtime/runtime.js'
+import { Environment, WindowSetDarkTheme, WindowSetLightTheme, ReconnectWebSocket, WaitForWebSocket } from 'wailsjs/runtime/runtime.js'
 import { darkThemeOverrides, themeOverrides } from '@/utils/theme.js'
 import AboutDialog from '@/components/dialogs/AboutDialog.vue'
 import FlushDbDialog from '@/components/dialogs/FlushDbDialog.vue'
@@ -52,6 +52,8 @@ const checkAuth = async () => {
 
 const onLogin = async () => {
     authenticated.value = true
+    // Reconnect WebSocket with auth cookie now available
+    await ReconnectWebSocket()
     await initApp()
 }
 
@@ -135,6 +137,7 @@ onMounted(async () => {
     window.addEventListener('rdm:unauthorized', onUnauthorized)
     await checkAuth()
     if (authenticated.value) {
+        await WaitForWebSocket()
         await initApp()
     }
 })

@@ -6,6 +6,15 @@
 let ws = null
 let reconnectTimer = null
 const listeners = new Map() // event -> Set<callback>
+let wsReadyResolve = null
+let wsReadyPromise = null
+
+function resetReadyPromise() {
+    wsReadyPromise = new Promise((resolve) => {
+        wsReadyResolve = resolve
+    })
+}
+resetReadyPromise()
 
 function getWsUrl() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -24,6 +33,10 @@ export function connectWebSocket() {
         if (reconnectTimer) {
             clearTimeout(reconnectTimer)
             reconnectTimer = null
+        }
+        if (wsReadyResolve) {
+            wsReadyResolve()
+            wsReadyResolve = null
         }
     }
 
@@ -48,10 +61,35 @@ export function connectWebSocket() {
     }
 }
 
+// Wait until WebSocket is connected
+export function waitForWebSocket() {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        return Promise.resolve()
+    }
+    return wsReadyPromise
+}
+
+// Force reconnect (e.g. after login)
+export function reconnectWebSocket() {
+    if (ws) {
+        ws.onclose = null // prevent auto-reconnect
+        ws.close()
+        ws = null
+    }
+    if (reconnectTimer) {
+        clearTimeout(reconnectTimer)
+        reconnectTimer = null
+    }
+    resetReadyPromise()
+    connectWebSocket()
+    return wsReadyPromise
+}
+
 function scheduleReconnect() {
     if (!reconnectTimer) {
         reconnectTimer = setTimeout(() => {
             reconnectTimer = null
+            resetReadyPromise()
             connectWebSocket()
         }, 3000)
     }
@@ -91,5 +129,7 @@ export function offWsEvent(event, callback) {
 export function sendWsMessage(msg) {
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify(msg))
+    } else {
+        console.warn('[ws] not connected, message dropped:', msg.event)
     }
 }

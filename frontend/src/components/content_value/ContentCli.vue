@@ -3,7 +3,7 @@ import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import 'xterm/css/xterm.css'
-import { EventsEmit, EventsOff, EventsOn } from 'wailsjs/runtime/runtime.js'
+import { EventsEmit, EventsOff, EventsOn, WaitForWebSocket } from 'wailsjs/runtime/runtime.js'
 import { get, isEmpty, set, size, trim } from 'lodash'
 import { CloseCli, StartCli } from 'wailsjs/go/services/cliService.js'
 import usePreferencesStore from 'stores/preferences.js'
@@ -94,6 +94,7 @@ onMounted(async () => {
     // term.write('\x1b[4h') // insert mode
 
     EventsOn(`cmd:output:${props.name}`, receiveTermOutput)
+    await WaitForWebSocket()
     await CloseCli(props.name)
     await StartCli(props.name, 0)
 
