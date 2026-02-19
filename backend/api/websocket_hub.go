@@ -54,7 +54,11 @@ var upgrader = websocket.Upgrader{
 		if origin == "" {
 			return true // no Origin header (non-browser client)
 		}
-		host := r.Host
+		// Use X-Forwarded-Host if behind reverse proxy
+		host := r.Header.Get("X-Forwarded-Host")
+		if host == "" {
+			host = r.Host
+		}
 		originHost := origin
 		if idx := strings.Index(origin, "://"); idx >= 0 {
 			originHost = origin[idx+3:]

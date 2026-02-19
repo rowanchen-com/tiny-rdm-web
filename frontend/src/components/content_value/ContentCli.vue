@@ -84,7 +84,7 @@ const newTerm = () => {
     return { term, fitAddon }
 }
 
-onMounted(() => {
+onMounted(async () => {
     const { term, fitAddon } = newTerm()
     termInst = term
     fitAddonInst = fitAddon
@@ -92,10 +92,11 @@ onMounted(() => {
 
     term.writeln('\r\n' + i18nGlobal.t('interface.cli_welcome'))
     // term.write('\x1b[4h') // insert mode
-    CloseCli(props.name)
-    StartCli(props.name, 0)
 
     EventsOn(`cmd:output:${props.name}`, receiveTermOutput)
+    await CloseCli(props.name)
+    await StartCli(props.name, 0)
+
     fitAddon.fit()
     term.focus()
 })

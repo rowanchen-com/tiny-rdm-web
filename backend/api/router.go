@@ -32,7 +32,7 @@ func SetupRouter(assets embed.FS) *gin.Engine {
 		origin := c.GetHeader("Origin")
 		if origin != "" {
 			// Only allow same-origin: compare Origin with Host
-			host := c.Request.Host
+			host := getRequestHost(c)
 			// Extract host from origin (e.g., "http://localhost:8088" -> "localhost:8088")
 			originHost := origin
 			if idx := strings.Index(origin, "://"); idx >= 0 {
@@ -100,6 +100,15 @@ func SetupRouter(assets embed.FS) *gin.Engine {
 	return r
 }
 
+// getRequestHost returns the effective host, considering reverse proxy headers
+func getRequestHost(c *gin.Context) string {
+	// Check X-Forwarded-Host first (reverse proxy)
+	if fwdHost := c.GetHeader("X-Forwarded-Host"); fwdHost != "" {
+		return fwdHost
+	}
+	return c.Request.Host
+}
+
 // csrfProtection validates Origin/Referer for state-changing requests
 func csrfProtection() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -110,7 +119,7 @@ func csrfProtection() gin.HandlerFunc {
 			return
 		}
 
-		host := c.Request.Host
+		host := getRequestHost(c)
 		// Check Origin header first
 		origin := c.GetHeader("Origin")
 		if origin != "" {
@@ -153,7 +162,7 @@ func wsAuthCheck() gin.HandlerFunc {
 		// Validate Origin header to prevent Cross-Site WebSocket Hijacking
 		origin := c.GetHeader("Origin")
 		if origin != "" {
-			host := c.Request.Host
+			host := getRequestHost(c)
 			originHost := origin
 			if idx := strings.Index(origin, "://"); idx >= 0 {
 				originHost = origin[idx+3:]
