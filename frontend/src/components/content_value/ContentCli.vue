@@ -94,7 +94,18 @@ onMounted(async () => {
     // term.write('\x1b[4h') // insert mode
 
     EventsOn(`cmd:output:${props.name}`, receiveTermOutput)
-    await WaitForWebSocket()
+
+    // Wait for WebSocket with timeout (CLI needs it for real-time I/O)
+    try {
+        await Promise.race([
+            WaitForWebSocket(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('ws timeout')), 5000)),
+        ])
+    } catch {
+        // WebSocket not available, CLI will work via HTTP fallback
+        console.warn('[cli] WebSocket not connected, some features may be limited')
+    }
+
     await CloseCli(props.name)
     await StartCli(props.name, 0)
 

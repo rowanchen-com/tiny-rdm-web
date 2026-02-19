@@ -3,6 +3,7 @@ package api
 import (
 	"embed"
 	"io/fs"
+	"log"
 	"net/http"
 	"strings"
 	"tinyrdm/backend/services"
@@ -27,28 +28,20 @@ func SetupRouter(assets embed.FS) *gin.Engine {
 	// Security headers
 	r.Use(SecurityHeaders())
 
-	// Strict CORS - only allow same-origin requests
+	// CORS - validate origin for cross-origin requests
 	r.Use(func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
 		if origin != "" {
-			// Only allow same-origin: compare Origin with Host
-			host := getRequestHost(c)
-			// Extract host from origin (e.g., "http://localhost:8088" -> "localhost:8088")
-			originHost := origin
-			if idx := strings.Index(origin, "://"); idx >= 0 {
-				originHost = origin[idx+3:]
-			}
-			// Strip trailing slash
-			originHost = strings.TrimRight(originHost, "/")
-
-			if originHost != host {
+			if isSameOrigin(c, origin) {
+				c.Header("Access-Control-Allow-Origin", origin)
+				c.Header("Access-Control-Allow-Credentials", "true")
+				c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+				c.Header("Access-Control-Allow-Headers", "Content-Type, X-Requested-With")
+			} else {
+				log.Printf("[cors] blocked origin=%s host=%s", origin, getRequestHost(c))
 				c.AbortWithStatus(http.StatusForbidden)
 				return
 			}
-			c.Header("Access-Control-Allow-Origin", origin)
-			c.Header("Access-Control-Allow-Credentials", "true")
-			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-			c.Header("Access-Control-Allow-Headers", "Content-Type, X-Requested-With")
 		}
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
@@ -102,33 +95,56 @@ func SetupRouter(assets embed.FS) *gin.Engine {
 
 // getRequestHost returns the effective host, considering reverse proxy headers
 func getRequestHost(c *gin.Context) string {
-	// Check X-Forwarded-Host first (reverse proxy)
 	if fwdHost := c.GetHeader("X-Forwarded-Host"); fwdHost != "" {
 		return fwdHost
 	}
 	return c.Request.Host
 }
 
+// stripPort removes port from host string ("example.com:8088" -> "example.com")
+func stripPort(host string) string {
+	if idx := strings.LastIndex(host, ":"); idx >= 0 {
+		// Make sure it's not part of IPv6 address
+		if !strings.Contains(host, "]") || strings.LastIndex(host, "]") < idx {
+			return host[:idx]
+		}
+	}
+	return host
+}
+
+// extractOriginHost extracts hostname from Origin header value
+func extractOriginHost(origin string) string {
+	host := origin
+	if idx := strings.Index(host, "://"); idx >= 0 {
+		host = host[idx+3:]
+	}
+	host = strings.TrimRight(host, "/")
+	return host
+}
+
+// isSameOrigin checks if the Origin header matches the request host.
+// Compares hostnames only (ignoring port) to support reverse proxy scenarios
+// where the external port differs from the internal port.
+func isSameOrigin(c *gin.Context, origin string) bool {
+	originHost := stripPort(extractOriginHost(origin))
+	requestHost := stripPort(getRequestHost(c))
+	return originHost == requestHost
+}
+
 // csrfProtection validates Origin/Referer for state-changing requests
 func csrfProtection() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Only check state-changing methods
 		method := c.Request.Method
 		if method == "GET" || method == "HEAD" || method == "OPTIONS" {
 			c.Next()
 			return
 		}
 
-		host := getRequestHost(c)
 		// Check Origin header first
 		origin := c.GetHeader("Origin")
 		if origin != "" {
-			originHost := origin
-			if idx := strings.Index(origin, "://"); idx >= 0 {
-				originHost = origin[idx+3:]
-			}
-			originHost = strings.TrimRight(originHost, "/")
-			if originHost != host {
+			if !isSameOrigin(c, origin) {
+				log.Printf("[csrf] blocked origin=%s host=%s", origin, getRequestHost(c))
 				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"success": false, "msg": "cross-origin request blocked"})
 				return
 			}
@@ -139,14 +155,13 @@ func csrfProtection() gin.HandlerFunc {
 		// Fallback: check Referer
 		referer := c.GetHeader("Referer")
 		if referer != "" {
-			refererHost := referer
-			if idx := strings.Index(referer, "://"); idx >= 0 {
-				refererHost = referer[idx+3:]
-			}
+			refererHost := extractOriginHost(referer)
 			if slashIdx := strings.Index(refererHost, "/"); slashIdx >= 0 {
 				refererHost = refererHost[:slashIdx]
 			}
-			if refererHost != host {
+			requestHost := stripPort(getRequestHost(c))
+			if stripPort(refererHost) != requestHost {
+				log.Printf("[csrf] blocked referer=%s host=%s", referer, getRequestHost(c))
 				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"success": false, "msg": "cross-origin request blocked"})
 				return
 			}
@@ -159,16 +174,10 @@ func csrfProtection() gin.HandlerFunc {
 // wsAuthCheck validates auth and origin for WebSocket connections
 func wsAuthCheck() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Validate Origin header to prevent Cross-Site WebSocket Hijacking
 		origin := c.GetHeader("Origin")
 		if origin != "" {
-			host := getRequestHost(c)
-			originHost := origin
-			if idx := strings.Index(origin, "://"); idx >= 0 {
-				originHost = origin[idx+3:]
-			}
-			originHost = strings.TrimRight(originHost, "/")
-			if originHost != host {
+			if !isSameOrigin(c, origin) {
+				log.Printf("[ws] blocked origin=%s host=%s", origin, getRequestHost(c))
 				c.AbortWithStatus(http.StatusForbidden)
 				return
 			}

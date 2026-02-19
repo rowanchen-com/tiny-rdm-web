@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -49,22 +48,9 @@ func Hub() *WSHub {
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		// Validate Origin header - only allow same-origin connections
-		origin := r.Header.Get("Origin")
-		if origin == "" {
-			return true // no Origin header (non-browser client)
-		}
-		// Use X-Forwarded-Host if behind reverse proxy
-		host := r.Header.Get("X-Forwarded-Host")
-		if host == "" {
-			host = r.Host
-		}
-		originHost := origin
-		if idx := strings.Index(origin, "://"); idx >= 0 {
-			originHost = origin[idx+3:]
-		}
-		originHost = strings.TrimRight(originHost, "/")
-		return originHost == host
+		// Origin validation is handled by wsAuthCheck middleware
+		// Allow all here to avoid double-checking
+		return true
 	},
 }
 
