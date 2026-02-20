@@ -47,7 +47,7 @@ const setViewport = (mode) => {
         if (ratio < 1) {
             vw = 680 // portrait phone
         } else if (sh < 500) {
-            vw = 1024 // landscape phone: same as desktop to show everything
+            vw = 1280 // landscape phone: larger to shrink content and fit everything
         } else {
             vw = 1024 // desktop / tablet
         }
