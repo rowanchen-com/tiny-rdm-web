@@ -35,11 +35,11 @@ const setViewport = (mode) => {
     const meta = document.querySelector('meta[name="viewport"]')
     if (!meta) return
     if (mode === 'mobile') {
+        // Login page: responsive for mobile
         meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
     } else {
-        // Desktop/app mode: use device-width for responsive layout
-        // Mobile CSS overrides handle the layout adaptation
-        meta.setAttribute('content', 'width=device-width, initial-scale=1.0, user-scalable=no')
+        // App page: show PC layout, auto-scale to fit, allow pinch zoom
+        meta.setAttribute('content', 'width=1024, user-scalable=yes')
     }
 }
 
