@@ -8,13 +8,13 @@ import AddFieldsDialog from './components/dialogs/AddFieldsDialog.vue'
 import AppContent from './AppContent.vue'
 import GroupDialog from './components/dialogs/GroupDialog.vue'
 import DeleteKeyDialog from './components/dialogs/DeleteKeyDialog.vue'
-import { h, onMounted, onUnmounted, ref, watch } from 'vue'
+import { h, onMounted, onUnmounted, ref, watch, defineAsyncComponent, shallowRef } from 'vue'
 import usePreferencesStore from './stores/preferences.js'
 import useConnectionStore from './stores/connections.js'
 import { useI18n } from 'vue-i18n'
 import { darkTheme, NButton, NSpace } from 'naive-ui'
 import KeyFilterDialog from './components/dialogs/KeyFilterDialog.vue'
-import { Environment, WindowSetDarkTheme, WindowSetLightTheme, ReconnectWebSocket } from 'wailsjs/runtime/runtime.js'
+import { Environment, WindowSetDarkTheme, WindowSetLightTheme } from 'wailsjs/runtime/runtime.js'
 import { darkThemeOverrides, themeOverrides } from '@/utils/theme.js'
 import AboutDialog from '@/components/dialogs/AboutDialog.vue'
 import FlushDbDialog from '@/components/dialogs/FlushDbDialog.vue'
@@ -23,40 +23,41 @@ import ImportKeyDialog from '@/components/dialogs/ImportKeyDialog.vue'
 import { Info } from 'wailsjs/go/services/systemService.js'
 import DecoderDialog from '@/components/dialogs/DecoderDialog.vue'
 import { loadModule, trackEvent } from '@/utils/analytics.js'
-import LoginPage from '@/components/LoginPage.vue'
 
 const prefStore = usePreferencesStore()
 const connectionStore = useConnectionStore()
 const i18n = useI18n()
 const initializing = ref(true)
 
-// Viewport management for mobile: login page uses responsive, app uses desktop layout
+// Detect if running in web mode (VITE_WEB=true at build time)
+const isWebMode = import.meta.env.VITE_WEB === 'true'
+
+// Web-only: lazy load LoginPage to avoid importing websocket.js in desktop mode
+const LoginPage = isWebMode ? defineAsyncComponent(() => import('@/components/LoginPage.vue')) : null
+
+// Viewport management for mobile
 const setViewport = (mode) => {
     const meta = document.querySelector('meta[name="viewport"]')
     if (!meta) return
     if (mode === 'mobile') {
-        // Login page: responsive for mobile
         meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
     } else {
-        // App page: PC layout scaled to fit screen, pinch zoom enabled
-        // Use smaller width on portrait screens so content appears larger
         const ratio = (window.innerWidth || screen.width) / (window.innerHeight || screen.height)
-        const sw = window.innerWidth || screen.width
         const sh = window.innerHeight || screen.height
         let vw
         if (ratio < 1) {
-            vw = 680 // portrait phone
+            vw = 680
         } else if (sh < 500) {
-            vw = 1280 // landscape phone: larger to shrink content and fit everything
+            vw = 1280
         } else {
-            vw = 1024 // desktop / tablet
+            vw = 1024
         }
         meta.setAttribute('content', `width=${vw}, user-scalable=yes`)
     }
 }
 
-// Auth state
-const authChecking = ref(true)
+// Auth state (web mode only)
+const authChecking = ref(isWebMode) // desktop: false (skip), web: true (checking)
 const authenticated = ref(false)
 const authEnabled = ref(false)
 
@@ -78,16 +79,21 @@ const checkAuth = async () => {
 const onLogin = async () => {
     authenticated.value = true
     setViewport('desktop')
-    // Reconnect WebSocket with auth cookie now available (non-blocking)
-    ReconnectWebSocket()
+    // Reconnect WebSocket with auth cookie (dynamic import to avoid desktop issues)
+    try {
+        const runtime = await import('wailsjs/runtime/runtime.js')
+        if (runtime.ReconnectWebSocket) runtime.ReconnectWebSocket()
+    } catch {}
     await initApp()
 }
 
 const initApp = async () => {
     try {
         initializing.value = true
-        await prefStore.loadPreferences()
-        i18n.locale.value = prefStore.currentLanguage
+        if (isWebMode) {
+            await prefStore.loadPreferences()
+            i18n.locale.value = prefStore.currentLanguage
+        }
         await prefStore.loadFontList()
         await prefStore.loadBuildInDecoder()
         await connectionStore.initConnections()
@@ -168,23 +174,29 @@ const onOrientationChange = () => {
 }
 
 onMounted(async () => {
-    window.addEventListener('rdm:unauthorized', onUnauthorized)
-    window.addEventListener('orientationchange', onOrientationChange)
-    window.addEventListener('resize', onOrientationChange)
-    await checkAuth()
-    if (authenticated.value || !authEnabled.value) {
-        // Authenticated, or auth not enabled (desktop mode / no password set)
-        setViewport('desktop')
-        await initApp()
+    if (isWebMode) {
+        window.addEventListener('rdm:unauthorized', onUnauthorized)
+        window.addEventListener('orientationchange', onOrientationChange)
+        window.addEventListener('resize', onOrientationChange)
+        await checkAuth()
+        if (authenticated.value || !authEnabled.value) {
+            setViewport('desktop')
+            await initApp()
+        } else {
+            setViewport('mobile')
+        }
     } else {
-        setViewport('mobile')
+        // Desktop mode: original Wails flow, no auth needed
+        await initApp()
     }
 })
 
 onUnmounted(() => {
-    window.removeEventListener('rdm:unauthorized', onUnauthorized)
-    window.removeEventListener('orientationchange', onOrientationChange)
-    window.removeEventListener('resize', onOrientationChange)
+    if (isWebMode) {
+        window.removeEventListener('rdm:unauthorized', onUnauthorized)
+        window.removeEventListener('orientationchange', onOrientationChange)
+        window.removeEventListener('resize', onOrientationChange)
+    }
 })
 
 // watch theme and dynamically switch
@@ -207,12 +219,12 @@ watch(
         :theme="prefStore.isDark ? darkTheme : undefined"
         :theme-overrides="prefStore.isDark ? darkThemeOverrides : themeOverrides"
         class="fill-height">
-        <!-- Auth gate -->
-        <template v-if="authChecking">
+        <!-- Web mode: auth gate -->
+        <template v-if="isWebMode && authChecking">
             <div style="width: 100vw; height: 100vh"></div>
         </template>
-        <template v-else-if="authEnabled && !authenticated">
-            <login-page @login="onLogin" />
+        <template v-else-if="isWebMode && authEnabled && !authenticated">
+            <component :is="LoginPage" @login="onLogin" />
         </template>
         <template v-else>
             <n-dialog-provider>
