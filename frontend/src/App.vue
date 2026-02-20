@@ -37,7 +37,7 @@ const setViewport = (mode) => {
     if (mode === 'mobile') {
         meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
     } else {
-        meta.setAttribute('content', 'width=1024, initial-scale=0, shrink-to-fit=yes')
+        meta.setAttribute('content', 'width=1024, user-scalable=yes')
     }
 }
 
