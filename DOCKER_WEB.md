@@ -290,9 +290,9 @@ services.EventsEmit(s.ctx, "event_name", data)
 
 同理，`runtime.OpenFileDialog`、`runtime.SaveFileDialog`、`runtime.EventsOn` 等调用也做相同替换。
 
-#### 4. `backend/services/connection_service.go` — 新增两个方法
+#### 4. `backend/services/connection_service_web.go` — Web 专用方法（`//go:build web`）
 
-除了上述平台抽象替换外，还新增了两个 Web 专用方法（原版不存在）：
+原版 `connection_service.go` 中的 `ExportConnections` / `ImportConnections` 使用原生文件对话框，Web 模式下不可用。新增独立文件 `connection_service_web.go`（带 `//go:build web` 构建标签），包含两个 Web 专用方法：
 
 ```go
 // ExportConnectionsToBytes 将连接配置导出为 zip 字节数组（Web 模式下载用）
@@ -302,7 +302,7 @@ func (c *connectionService) ExportConnectionsToBytes() ([]byte, string, error)
 func (c *connectionService) ImportConnectionsFromBytes(data []byte) (resp types.JSResp)
 ```
 
-这两个方法解决了 Web 模式下无法使用原生文件对话框的问题，通过 HTTP 文件上传/下载替代。
+这两个方法通过 `//go:build web` 标签与桌面模式完全隔离，桌面编译时不会包含这些代码。`bytes` 包的导入也随之移到了 Web 专用文件中，保持 `connection_service.go` 与原版的最小差异。
 
 ### 新增文件
 
@@ -560,7 +560,7 @@ Web 版新增了移动端浏览器的基础适配：
 | `go.mod` / `go.sum` | 新增 `gin-gonic/gin` direct 依赖 + 相关 indirect 依赖 | ~30 行 |
 | `backend/services/browser_service.go` | `runtime.EventsEmit` → `services.EventsEmit` 等 | ~15 处替换 |
 | `backend/services/cli_service.go` | 同上 | ~5 处替换 |
-| `backend/services/connection_service.go` | 同上 + 新增 `ExportConnectionsToBytes`/`ImportConnectionsFromBytes` | ~10 处替换 + 2 个新方法 |
+| `backend/services/connection_service.go` | 同上（平台抽象替换） | ~10 处替换 |
 | `backend/services/monitor_service.go` | 同上 | ~5 处替换 |
 | `backend/services/pubsub_service.go` | 同上 | ~5 处替换 |
 | `backend/services/preferences_service.go` | 同上 | ~3 处替换 |
@@ -579,6 +579,7 @@ Web 版新增了移动端浏览器的基础适配：
 | `main_web.go` | 85 | Web 入口，Gin 服务器 + 优雅关闭 |
 | `backend/services/platform_desktop.go` | 75 | 桌面平台抽象层（Wails 封装） |
 | `backend/services/platform_web.go` | 110 | Web 平台抽象层（回调 + Stub 类型） |
+| `backend/services/connection_service_web.go` | 95 | Web 专用连接导入导出方法（`//go:build web`） |
 | `backend/api/router.go` | 165 | Gin 路由器（安全头、CORS、CSRF、静态文件） |
 | `backend/api/auth.go` | 260 | 登录认证系统（Token、限速、中间件） |
 | `backend/api/websocket_hub.go` | 120 | WebSocket 连接管理 |
@@ -668,23 +669,43 @@ Web 版新增了移动端浏览器的基础适配：
 
 > 其他 6 个 service 文件的改动模式完全相同。
 
-### `backend/services/connection_service.go`（额外新增）
+### `backend/services/connection_service.go`（平台抽象替换）
 
 ```diff
  import (
      // ...
-+    "bytes"
+-    "bytes"
 -    "github.com/wailsapp/wails/v2/pkg/runtime"
++    // bytes 已移至 connection_service_web.go
  )
 
  // 原有方法中的 runtime.* 调用替换为 services.* （同上）
+-    runtime.EventsEmit(...)
++    services.EventsEmit(...)
 
-+// 新增方法：Web 模式连接导出（返回 zip 字节数组）
-+func (c *connectionService) ExportConnectionsToBytes() ([]byte, string, error) { ... }
-+
-+// 新增方法：Web 模式连接导入（从 zip 字节数组）
-+func (c *connectionService) ImportConnectionsFromBytes(data []byte) (resp types.JSResp) { ... }
+-// ExportConnectionsToBytes 和 ImportConnectionsFromBytes 已移至 connection_service_web.go
 ```
+
+### `backend/services/connection_service_web.go`（新增文件）
+
+```go
+//go:build web
+
+package services
+
+import (
+    "bytes"
+    // ...
+)
+
+// Web 专用：连接导出为 zip 字节数组（HTTP 下载用）
+func (c *connectionService) ExportConnectionsToBytes() ([]byte, string, error) { ... }
+
+// Web 专用：从 zip 字节数组导入连接（HTTP 上传用）
+func (c *connectionService) ImportConnectionsFromBytes(data []byte) (resp types.JSResp) { ... }
+```
+
+> 通过 `//go:build web` 构建标签，这两个方法仅在 Web 模式编译时存在，桌面模式完全不包含。
 
 ### `frontend/vite.config.js`
 
@@ -927,7 +948,7 @@ Web 版新增了移动端浏览器的基础适配：
 **解决方案**：
 - `api.js` 中的 `SelectFile()` 使用 `<input type="file">` 让用户选择文件，上传到 `/api/system/select-file`，后端保存到 `os.TempDir()` 并返回路径
 - `api.js` 中的 `SaveFile()` 通过 `/api/system/download` 触发浏览器下载
-- 连接导入导出：新增 `ExportConnectionsToBytes()`/`ImportConnectionsFromBytes()` 方法 + `/api/connection/export-download`、`/api/connection/import-upload` 端点
+- 连接导入导出：新增 `connection_service_web.go`（`//go:build web`），包含 `ExportConnectionsToBytes()`/`ImportConnectionsFromBytes()` 方法 + `/api/connection/export-download`、`/api/connection/import-upload` 端点
 - 安全防护：`sanitizeFilename()` 防路径遍历，`safeTempPath()` 限制下载范围
 
 ### 6. 窗口管理 → 浏览器适配
