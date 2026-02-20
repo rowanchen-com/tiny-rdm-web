@@ -8,6 +8,7 @@ COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
 ENV NODE_OPTIONS=--max-old-space-size=4096
+ENV VITE_WEB=true
 RUN npm run build
 
 # ============================================================

@@ -1,4 +1,4 @@
-import { Environment } from '@/utils/wails_runtime.js'
+import { Environment } from 'wailsjs/runtime/runtime.js'
 
 let os = ''
 

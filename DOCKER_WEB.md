@@ -186,16 +186,16 @@ Web 模式编译 (web):
 
 Service 层代码调用这些函数时无需关心底层是 Wails 还是 WebSocket。
 
-### 核心机制：Vite 别名重定向
+### 核心机制：Vite 条件别名重定向
 
-前端通过 `vite.config.js` 中的 8 个别名，将所有 `wailsjs/*` 导入重定向到 Web 适配器：
+前端通过 `vite.config.js` 中的环境变量 `VITE_WEB` 条件启用 8 个别名，将所有 `wailsjs/*` 导入重定向到 Web 适配器：
 
 ```javascript
 // 原始 Store 代码（不修改）：
 import { OpenConnection } from 'wailsjs/go/services/browserService.js'
 
-// 桌面模式：解析到 wailsjs/go/services/browserService.js（Wails 生成的 RPC 绑定）
-// Web 模式：通过 Vite 别名解析到 src/utils/api.js（HTTP 请求）
+// 桌面模式（VITE_WEB 未设置）：解析到 wailsjs/go/services/browserService.js（Wails 生成的 RPC 绑定）
+// Web 模式（VITE_WEB=true）：通过 Vite 别名解析到 src/utils/api.js（HTTP 请求）
 ```
 
 别名映射：
@@ -210,7 +210,7 @@ import { OpenConnection } from 'wailsjs/go/services/browserService.js'
 | `wailsjs/go/services/preferencesService.js` | `src/utils/api.js` |
 | `wailsjs/go/services/systemService.js` | `src/utils/api.js` |
 
-> 注意：`wailsjs` 通配别名放在最后，确保具体路径别名优先匹配。
+> 注意：`wailsjs` 通配别名放在最后，确保具体路径别名优先匹配。别名仅在 `VITE_WEB=true` 时启用，桌面模式构建不受影响。
 
 ### 架构图
 
@@ -341,25 +341,25 @@ func (c *connectionService) ImportConnectionsFromBytes(data []byte) (resp types.
 
 ### 原始文件修改
 
-#### 1. `frontend/vite.config.js` — 别名 + 代理
+#### 1. `frontend/vite.config.js` — 条件别名 + 代理
 
-原版仅有 3 个别名（`@`、`stores`、`wailsjs`），修改后新增 8 个具体路径别名 + dev server proxy：
+原版仅有 3 个别名（`@`、`stores`、`wailsjs`），修改后通过 `VITE_WEB` 环境变量条件启用 8 个 Web 别名 + dev server proxy：
 
 ```javascript
-// 新增的别名（在 wailsjs 通配别名之前）
-'wailsjs/runtime/runtime.js': rootPath + 'src/utils/wails_runtime.js',
-'wailsjs/go/services/connectionService.js': rootPath + 'src/utils/api.js',
-'wailsjs/go/services/browserService.js': rootPath + 'src/utils/api.js',
-// ... 共 8 个
+const isWeb = process.env.VITE_WEB === 'true'
 
-// 新增 dev server proxy
-server: {
-    proxy: {
-        '/api': { target: 'http://localhost:8088', changeOrigin: true },
-        '/ws': { target: 'ws://localhost:8088', ws: true },
-    },
-},
+// 条件别名（仅 VITE_WEB=true 时启用）
+...(isWeb ? {
+    'wailsjs/runtime/runtime.js': rootPath + 'src/utils/wails_runtime.js',
+    'wailsjs/go/services/connectionService.js': rootPath + 'src/utils/api.js',
+    // ... 共 8 个
+} : {}),
+
+// 条件 dev server proxy（仅 VITE_WEB=true 时启用）
+...(isWeb ? { server: { proxy: { '/api': ..., '/ws': ... } } } : {}),
 ```
+
+> 关键：桌面模式（`wails build`）不设置 `VITE_WEB`，别名不生效，`wailsjs/*` 导入解析到 Wails 真实 RPC 绑定。Docker 构建时 Dockerfile 设置 `ENV VITE_WEB=true`，别名生效，重定向到 HTTP/WebSocket 适配器。
 
 #### 2. `frontend/src/App.vue` — 登录认证门控 + Viewport 管理
 
@@ -393,7 +393,7 @@ server: {
 
 #### 5. `frontend/src/utils/platform.js` — 新增 Web 平台检测
 
-原版导入路径为 `wailsjs/runtime/runtime.js`，修改为 `@/utils/wails_runtime.js`（避免循环别名）。新增：
+导入路径保持原版不变（`wailsjs/runtime/runtime.js`），Web 模式下通过 Vite 条件别名自动重定向到 `wails_runtime.js`。新增：
 
 ```javascript
 export function isWeb() {
@@ -449,6 +449,7 @@ FROM alpine:3.21
 - `GOPROXY=https://goproxy.cn,https://goproxy.io,direct`：Go 模块代理（中国网络优化）
 - `GOFLAGS=-mod=mod`：允许 go mod tidy 自动修改
 - `NODE_OPTIONS=--max-old-space-size=4096`：前端构建内存限制
+- `VITE_WEB=true`：激活 Vite 条件别名，将 `wailsjs/*` 重定向到 Web 适配器
 - `XDG_CONFIG_HOME=/app`：配置文件存储在 `/app/TinyRDM/`
 
 ### 相关文件
@@ -565,11 +566,11 @@ Web 版新增了移动端浏览器的基础适配：
 | `backend/services/pubsub_service.go` | 同上 | ~5 处替换 |
 | `backend/services/preferences_service.go` | 同上 | ~3 处替换 |
 | `backend/services/system_service.go` | 同上 | ~3 处替换 |
-| `frontend/vite.config.js` | 新增 8 个别名 + dev proxy | ~20 行 |
+| `frontend/vite.config.js` | 条件别名（`VITE_WEB=true` 时启用）+ dev proxy | ~30 行 |
 | `frontend/src/App.vue` | 新增登录认证门控 + viewport 管理 + WebSocket 重连 | 重写大部分逻辑 |
 | `frontend/src/AppContent.vue` | Web 模式隐藏窗口控制按钮 + `isWeb()` 样式判断 + `100dvh` | ~10 行 |
 | `frontend/src/components/sidebar/Ribbon.vue` | Web 模式新增退出登录按钮 | ~15 行 |
-| `frontend/src/utils/platform.js` | 导入路径修改 + 新增 `isWeb()` 函数 | ~5 行 |
+| `frontend/src/utils/platform.js` | 新增 `isWeb()` 函数（导入路径保持原版不变） | ~3 行 |
 | `frontend/index.html` | 新增 favicon link | 1 行 |
 
 ### 新增文件
@@ -710,28 +711,35 @@ func (c *connectionService) ImportConnectionsFromBytes(data []byte) (resp types.
 ### `frontend/vite.config.js`
 
 ```diff
++const isWeb = process.env.VITE_WEB === 'true'
++
      resolve: {
          alias: {
              '@': rootPath + 'src',
              stores: rootPath + 'src/stores',
-+            'wailsjs/runtime/runtime.js': rootPath + 'src/utils/wails_runtime.js',
-+            'wailsjs/go/services/connectionService.js': rootPath + 'src/utils/api.js',
-+            'wailsjs/go/services/browserService.js': rootPath + 'src/utils/api.js',
-+            'wailsjs/go/services/cliService.js': rootPath + 'src/utils/api.js',
-+            'wailsjs/go/services/monitorService.js': rootPath + 'src/utils/api.js',
-+            'wailsjs/go/services/pubsubService.js': rootPath + 'src/utils/api.js',
-+            'wailsjs/go/services/preferencesService.js': rootPath + 'src/utils/api.js',
-+            'wailsjs/go/services/systemService.js': rootPath + 'src/utils/api.js',
++            // Web mode only (VITE_WEB=true): redirect wailsjs imports
++            ...(isWeb ? {
++                'wailsjs/runtime/runtime.js': rootPath + 'src/utils/wails_runtime.js',
++                'wailsjs/go/services/connectionService.js': rootPath + 'src/utils/api.js',
++                'wailsjs/go/services/browserService.js': rootPath + 'src/utils/api.js',
++                'wailsjs/go/services/cliService.js': rootPath + 'src/utils/api.js',
++                'wailsjs/go/services/monitorService.js': rootPath + 'src/utils/api.js',
++                'wailsjs/go/services/pubsubService.js': rootPath + 'src/utils/api.js',
++                'wailsjs/go/services/preferencesService.js': rootPath + 'src/utils/api.js',
++                'wailsjs/go/services/systemService.js': rootPath + 'src/utils/api.js',
++            } : {}),
              wailsjs: rootPath + 'wailsjs',
          },
      },
      // ...
-+    server: {
-+        proxy: {
-+            '/api': { target: 'http://localhost:8088', changeOrigin: true },
-+            '/ws': { target: 'ws://localhost:8088', ws: true },
++    ...(isWeb ? {
++        server: {
++            proxy: {
++                '/api': { target: 'http://localhost:8088', changeOrigin: true },
++                '/ws': { target: 'ws://localhost:8088', ws: true },
++            },
 +        },
-+    },
++    } : {}),
  })
 ```
 
@@ -781,7 +789,7 @@ func (c *connectionService) ImportConnectionsFromBytes(data []byte) (resp types.
 +    window.addEventListener('orientationchange', onOrientationChange)
 +    window.addEventListener('resize', onOrientationChange)
 +    await checkAuth()
-+    if (authenticated.value) {
++    if (authenticated.value || !authEnabled.value) {
 +        setViewport('desktop')
 +        await initApp()
 +    } else {
@@ -883,7 +891,7 @@ func (c *connectionService) ImportConnectionsFromBytes(data []byte) (resp types.
 
 ```diff
 -import { Environment } from 'wailsjs/runtime/runtime.js'
-+import { Environment } from '@/utils/wails_runtime.js'
++import { Environment } from 'wailsjs/runtime/runtime.js'  // 保持原版导入路径，Web 模式通过 Vite 别名重定向
 
  // ... 原有函数不变
 

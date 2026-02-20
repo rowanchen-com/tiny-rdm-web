@@ -172,7 +172,8 @@ onMounted(async () => {
     window.addEventListener('orientationchange', onOrientationChange)
     window.addEventListener('resize', onOrientationChange)
     await checkAuth()
-    if (authenticated.value) {
+    if (authenticated.value || !authEnabled.value) {
+        // Authenticated, or auth not enabled (desktop mode / no password set)
         setViewport('desktop')
         await initApp()
     } else {
