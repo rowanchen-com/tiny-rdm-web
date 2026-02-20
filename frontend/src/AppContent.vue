@@ -57,7 +57,7 @@ const logoPaddingLeft = ref(10)
 const maximised = ref(false)
 const hideRadius = ref(false)
 const wrapperStyle = computed(() => {
-    if (isWindows()) {
+    if (isWindows() || isWeb()) {
         return {}
     }
     return hideRadius.value
@@ -68,7 +68,7 @@ const wrapperStyle = computed(() => {
           }
 })
 const spinStyle = computed(() => {
-    if (isWindows()) {
+    if (isWindows() || isWeb()) {
         return {
             backgroundColor: themeVars.value.bodyColor,
         }
@@ -240,12 +240,11 @@ const onKeyShortcut = (e) => {
 #app-content-wrapper {
     width: 100vw;
     height: 100vh;
-    overflow: auto;
-    -webkit-overflow-scrolling: touch;
+    height: 100dvh;
+    overflow: hidden;
     box-sizing: border-box;
     background-color: v-bind('themeVars.bodyColor');
     color: v-bind('themeVars.textColorBase');
-    touch-action: manipulation;
 
     #app-toolbar {
         background-color: v-bind('exThemeVars.titleColor');
