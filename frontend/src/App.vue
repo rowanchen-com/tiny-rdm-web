@@ -160,8 +160,17 @@ const onUnauthorized = () => {
     }
 }
 
+let resizeTimer = null
+const onOrientationChange = () => {
+    if (!authenticated.value) return
+    clearTimeout(resizeTimer)
+    resizeTimer = setTimeout(() => setViewport('desktop'), 200)
+}
+
 onMounted(async () => {
     window.addEventListener('rdm:unauthorized', onUnauthorized)
+    window.addEventListener('orientationchange', onOrientationChange)
+    window.addEventListener('resize', onOrientationChange)
     await checkAuth()
     if (authenticated.value) {
         setViewport('desktop')
@@ -173,6 +182,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
     window.removeEventListener('rdm:unauthorized', onUnauthorized)
+    window.removeEventListener('orientationchange', onOrientationChange)
+    window.removeEventListener('resize', onOrientationChange)
 })
 
 // watch theme and dynamically switch
