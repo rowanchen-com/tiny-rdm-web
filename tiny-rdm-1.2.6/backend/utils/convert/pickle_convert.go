@@ -1,0 +1,112 @@
+package convutil
+
+import (
+	"os/exec"
+	"runtime"
+)
+
+type PickleConvert struct {
+	CmdConvert
+}
+
+const pickleDecodeCode = `
+import base64
+import json
+import pickle
+import sys
+from datetime import datetime
+
+def default_serializer(o):
+    if isinstance(o, datetime):
+        return o.isoformat()
+    return str(o)
+
+def object_hook(obj):
+    for k, v in obj.items():
+        if isinstance(v, str):
+            try:
+                obj[k] = datetime.fromisoformat(v)
+            except ValueError:
+                pass
+    return obj
+
+if __name__ == "__main__":
+    if len(sys.argv) >= 3:
+        action = sys.argv[1].lower()
+        content = sys.argv[2]
+
+        try:
+            if action == 'decode':
+                decoded = base64.b64decode(content)
+                obj = pickle.loads(decoded)
+                unserialized = json.dumps(obj, ensure_ascii=False, default=default_serializer)
+                print(base64.b64encode(unserialized.encode('utf-8')).decode('utf-8'))
+            elif action == 'encode':
+                decoded = base64.b64decode(content)
+                obj = json.loads(decoded, object_hook=object_hook)
+                serialized = pickle.dumps(obj)
+                print(base64.b64encode(serialized).decode('utf-8'))
+        except:
+            print('[RDM-ERROR]')
+    else:
+        print('[RDM-ERROR]')
+
+`
+
+func NewPickleConvert() *PickleConvert {
+	c := CmdConvert{
+		Name: "Pickle",
+		Auto: true,
+	}
+	c.DecodePath, c.EncodePath = "python3", "python3"
+	var err error
+	if _, err = exec.LookPath(c.DecodePath); err != nil {
+		c.DecodePath, c.EncodePath = "python", "python"
+		if _, err = exec.LookPath(c.DecodePath); err != nil {
+			return nil
+		}
+	}
+	// check if pickle available
+	if runtime.GOOS == "darwin" {
+		// the xcode-select installation prompt may appear on macOS
+		// so check it manually in advance
+		if _, err = exec.LookPath("xcode-select"); err != nil {
+			return nil
+		}
+	}
+
+	if _, err = runCommand(c.DecodePath, "-c", "import pickle"); err != nil {
+		return nil
+	}
+	var filepath string
+	if filepath, err = writeExecuteFile([]byte(pickleDecodeCode), "pickle_decoder.py"); err != nil {
+		return nil
+	}
+	c.DecodeArgs = []string{filepath, "decode"}
+	c.EncodeArgs = []string{filepath, "encode"}
+
+	return &PickleConvert{
+		CmdConvert: c,
+	}
+}
+
+func (p *PickleConvert) Enable() bool {
+	if p == nil {
+		return false
+	}
+	return true
+}
+
+func (p *PickleConvert) Encode(str string) (string, bool) {
+	if !p.Enable() {
+		return str, false
+	}
+	return p.CmdConvert.Encode(str)
+}
+
+func (p *PickleConvert) Decode(str string) (string, bool) {
+	if !p.Enable() {
+		return str, false
+	}
+	return p.CmdConvert.Decode(str)
+}
