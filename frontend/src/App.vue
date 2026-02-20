@@ -41,7 +41,16 @@ const setViewport = (mode) => {
         // App page: PC layout scaled to fit screen, pinch zoom enabled
         // Use smaller width on portrait screens so content appears larger
         const ratio = (window.innerWidth || screen.width) / (window.innerHeight || screen.height)
-        const vw = ratio < 1 ? 680 : 1024
+        // Portrait: 680, Landscape on mobile (short height): 580, Desktop: 1024
+        const sh = window.innerHeight || screen.height
+        let vw
+        if (ratio < 1) {
+            vw = 680 // portrait
+        } else if (sh < 500) {
+            vw = 580 // landscape on phone (short screen)
+        } else {
+            vw = 1024 // desktop / tablet
+        }
         meta.setAttribute('content', `width=${vw}, user-scalable=yes`)
     }
 }
