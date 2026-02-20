@@ -171,9 +171,10 @@ docker-compose down
 ```
 桌面模式编译 (!web):
   main.go ──→ services/*.go + platform_desktop.go ──→ Wails Runtime
+  （backend/api/ 整个目录不参与编译）
 
 Web 模式编译 (web):
-  main_web.go ──→ services/*.go + platform_web.go ──→ 回调函数 ──→ api 包
+  main_web.go ──→ services/*.go + platform_web.go ──→ 回调函数 ──→ api 包（全部 //go:build web）
 ```
 
 `platform_desktop.go` 和 `platform_web.go` 提供完全相同的函数签名：
@@ -220,6 +221,7 @@ import { OpenConnection } from 'wailsjs/go/services/browserService.js'
 │                                                             │
 │  Vue 前端 ──→ wailsjs/ RPC 绑定 ──→ Wails Runtime ──→ Go   │
 │                                                    Services │
+│  （backend/api/ 整个目录不参与编译）                           │
 └─────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────┐
@@ -313,21 +315,23 @@ func (c *connectionService) ImportConnectionsFromBytes(data []byte) (resp types.
 | `backend/services/platform_desktop.go` | `!web` | 封装 Wails Runtime 函数 + 类型别名指向 Wails 类型 |
 | `backend/services/platform_web.go` | `web` | 回调变量桥接到 WebSocket + Stub 类型替代 Wails 类型 |
 
-#### HTTP API 层
+#### HTTP API 层（全部 `//go:build web`）
+
+> **重要**：`backend/api/` 目录下的所有 11 个文件均带有 `//go:build web` 构建标签。整个 API 层是 Web 专用的，桌面模式（Wails）编译时完全不包含这些文件。这是确保桌面构建不引入 Gin 依赖和 Web 专用代码的关键设计。
 
 | 文件 | 构建标签 | 说明 |
 |---|---|---|
-| `backend/api/router.go` | 无 | Gin 路由器：请求体限制、安全头、CORS、CSRF、公开路由、认证中间件、静态文件服务 |
+| `backend/api/router.go` | `web` | Gin 路由器：请求体限制、安全头、CORS、CSRF、公开路由、认证中间件、静态文件服务 |
 | `backend/api/auth.go` | `web` | 登录认证：Token 生成/验证、限速器（含内存保护）、安全中间件 |
-| `backend/api/websocket_hub.go` | 无 | WebSocket 连接池管理（最大 50 连接）、事件广播、消息分发、读取限制 1MB |
-| `backend/api/event_bridge.go` | 无 | 事件桥接辅助函数 |
-| `backend/api/connection_api.go` | 无 | 连接管理 REST API + Web 专用导出下载/导入上传端点 |
-| `backend/api/browser_api.go` | 无 | 数据浏览 REST API（约 50 个端点，覆盖所有数据类型操作） |
-| `backend/api/cli_api.go` | 无 | CLI 会话 REST API（CLI 输入通过 WebSocket 事件处理） |
-| `backend/api/monitor_api.go` | 无 | Monitor REST API |
-| `backend/api/pubsub_api.go` | 无 | Pubsub REST API |
-| `backend/api/preferences_api.go` | 无 | 偏好设置 REST API |
-| `backend/api/system_api.go` | 无 | 系统信息 + 文件上传下载 REST API（含路径遍历防护） |
+| `backend/api/websocket_hub.go` | `web` | WebSocket 连接池管理（最大 50 连接）、事件广播、消息分发、读取限制 1MB |
+| `backend/api/event_bridge.go` | `web` | 事件桥接辅助函数 |
+| `backend/api/connection_api.go` | `web` | 连接管理 REST API + Web 专用导出下载/导入上传端点 |
+| `backend/api/browser_api.go` | `web` | 数据浏览 REST API（约 50 个端点，覆盖所有数据类型操作） |
+| `backend/api/cli_api.go` | `web` | CLI 会话 REST API（CLI 输入通过 WebSocket 事件处理） |
+| `backend/api/monitor_api.go` | `web` | Monitor REST API |
+| `backend/api/pubsub_api.go` | `web` | Pubsub REST API |
+| `backend/api/preferences_api.go` | `web` | 偏好设置 REST API |
+| `backend/api/system_api.go` | `web` | 系统信息 + 文件上传下载 REST API（含路径遍历防护） |
 
 #### Web 入口
 
@@ -361,19 +365,22 @@ const isWeb = process.env.VITE_WEB === 'true'
 
 > 关键：桌面模式（`wails build`）不设置 `VITE_WEB`，别名不生效，`wailsjs/*` 导入解析到 Wails 真实 RPC 绑定。Docker 构建时 Dockerfile 设置 `ENV VITE_WEB=true`，别名生效，重定向到 HTTP/WebSocket 适配器。
 
-#### 2. `frontend/src/App.vue` — 登录认证门控 + Viewport 管理
+#### 2. `frontend/src/App.vue` — 登录认证门控 + Viewport 管理 + 双模式分离
 
 这是改动最大的文件。原版直接在 `onMounted` 中初始化应用，修改后增加了完整的认证流程和移动端适配：
 
 新增内容：
-- `import LoginPage` 和 `import { ReconnectWebSocket }` 导入
-- `authChecking` / `authenticated` / `authEnabled` 响应式状态
+- `isWebMode` 编译时常量：`import.meta.env.VITE_WEB === 'true'`，用于完全分离桌面/Web 流程
+- `LoginPage` 使用 `defineAsyncComponent` 懒加载：仅 Web 模式下动态导入，避免桌面模式引入 `websocket.js` 等 Web 依赖
+- `authChecking` / `authenticated` / `authEnabled` 响应式状态（桌面模式下 `authChecking` 初始为 `false`，直接跳过认证）
 - `checkAuth()` 函数：调用 `/api/auth/status` 检查认证状态
-- `onLogin()` 回调：认证成功后重连 WebSocket、切换 viewport、初始化应用
+- `onLogin()` 回调：认证成功后通过动态 `import('wailsjs/runtime/runtime.js')` 调用 `ReconnectWebSocket()`，切换 viewport，初始化应用
 - `onUnauthorized()` 事件处理：401 时自动跳回登录页
 - `setViewport(mode)` 函数：登录页使用移动端响应式 viewport，主界面使用桌面布局 viewport（根据屏幕方向和尺寸动态计算 `width` 值）
 - `onOrientationChange()` 监听：屏幕旋转时重新计算 viewport
-- `initApp()` 开头新增 `await prefStore.loadPreferences()` + `i18n.locale.value = prefStore.currentLanguage`，修复登录后语言不正确的 bug
+- `onMounted` 中通过 `isWebMode` 完全分离两条路径：桌面模式直接调用 `initApp()`，Web 模式走认证流程
+- `initApp()` 中 Web 模式新增 `await prefStore.loadPreferences()` + `i18n.locale.value = prefStore.currentLanguage`
+- 事件监听器（`rdm:unauthorized`、`orientationchange`、`resize`）仅在 Web 模式下注册
 - 模板中新增三段 `<template>` 条件渲染：`authChecking` → 空白、`authEnabled && !authenticated` → `LoginPage`、`else` → 原始内容
 
 #### 3. `frontend/src/AppContent.vue` — 隐藏窗口控制按钮 + Web 样式适配
@@ -401,7 +408,31 @@ export function isWeb() {
 }
 ```
 
-#### 6. `frontend/index.html` — Favicon
+#### 6. `frontend/src/components/content_value/ContentCli.vue` — WaitForWebSocket 动态导入
+
+原版静态导入 `WaitForWebSocket`，但 Wails 生成的 `runtime.js` 不导出此函数，导致桌面构建失败。
+
+改动：
+- 移除静态导入中的 `WaitForWebSocket`（仅保留 `EventsEmit, EventsOff, EventsOn`）
+- 在 `onMounted` 中通过 `import.meta.env.VITE_WEB` 条件判断，仅 Web 模式下动态导入 `WaitForWebSocket`
+- 使用 `Promise.race` 添加 5 秒超时保护，避免 WebSocket 未连接时无限等待
+
+```javascript
+// Web 模式下动态导入（桌面模式完全跳过）
+if (import.meta.env.VITE_WEB === 'true') {
+    try {
+        const { WaitForWebSocket } = await import('wailsjs/runtime/runtime.js')
+        await Promise.race([
+            WaitForWebSocket(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('ws timeout')), 5000)),
+        ])
+    } catch {
+        console.warn('[cli] WebSocket not connected, some features may be limited')
+    }
+}
+```
+
+#### 7. `frontend/index.html` — Favicon
 
 原版无 favicon，新增：
 ```html
@@ -465,12 +496,32 @@ FROM alpine:3.21
 
 ## CI/CD 自动化
 
-新增 `.github/workflows/docker-publish.yml`，实现 GitHub Container Registry 自动构建推送：
+### Docker 镜像发布
 
-- 触发条件：`main` 分支 push、`v*` 标签、手动触发
+`.github/workflows/docker-publish.yml`，实现 GitHub Container Registry 自动构建推送：
+
+- 触发条件：仅 `release published`（发布版本时触发）+ 手动触发（`workflow_dispatch`）
 - 镜像仓库：`ghcr.io/rowanchen-com/tiny-rdm-web`
-- 标签策略：分支名、语义化版本（`{{version}}`、`{{major}}.{{minor}}`）、commit SHA、`latest`
+- 标签策略：语义化版本（`{{version}}`、`{{major}}.{{minor}}`）、`latest`
 - 构建平台：`linux/amd64`
+
+> 注意：不再在每次 push 到 main 时自动构建，避免频繁触发。仅在发布 Release 时才构建 Docker 镜像。
+
+### Windows 桌面应用发布
+
+`.github/workflows/release-windows.yaml`，自动构建 Windows 便携版 + NSIS 安装版：
+
+- 触发条件：`release published` + 手动触发（`workflow_dispatch`，需输入版本号）
+- 构建平台：`windows/amd64` + `windows/arm64`
+- 签名方式：CI 中使用 PowerShell `New-SelfSignedCertificate` 生成自签名证书，无需外部证书密钥
+- 产物：`TinyRDM_Portable_*.zip`（便携版）+ `TinyRDM_Setup_*.exe`（安装版，已签名）
+- 时间戳服务器：`http://timestamp.digicert.com`
+
+```powershell
+# CI 中自动生成自签名证书并签名
+$cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=Tiny RDM" ...
+Set-AuthenticodeSignature -FilePath $exePath -Certificate $cert -TimestampServer "http://timestamp.digicert.com"
+```
 
 ---
 
@@ -571,6 +622,7 @@ Web 版新增了移动端浏览器的基础适配：
 | `frontend/src/AppContent.vue` | Web 模式隐藏窗口控制按钮 + `isWeb()` 样式判断 + `100dvh` | ~10 行 |
 | `frontend/src/components/sidebar/Ribbon.vue` | Web 模式新增退出登录按钮 | ~15 行 |
 | `frontend/src/utils/platform.js` | 新增 `isWeb()` 函数（导入路径保持原版不变） | ~3 行 |
+| `frontend/src/components/content_value/ContentCli.vue` | `WaitForWebSocket` 改为动态导入（`import.meta.env.VITE_WEB` 条件） | ~15 行 |
 | `frontend/index.html` | 新增 favicon link | 1 行 |
 
 ### 新增文件
@@ -581,17 +633,17 @@ Web 版新增了移动端浏览器的基础适配：
 | `backend/services/platform_desktop.go` | 75 | 桌面平台抽象层（Wails 封装） |
 | `backend/services/platform_web.go` | 110 | Web 平台抽象层（回调 + Stub 类型） |
 | `backend/services/connection_service_web.go` | 95 | Web 专用连接导入导出方法（`//go:build web`） |
-| `backend/api/router.go` | 165 | Gin 路由器（安全头、CORS、CSRF、静态文件） |
-| `backend/api/auth.go` | 260 | 登录认证系统（Token、限速、中间件） |
-| `backend/api/websocket_hub.go` | 120 | WebSocket 连接管理 |
-| `backend/api/event_bridge.go` | 10 | 事件桥接辅助 |
-| `backend/api/connection_api.go` | 170 | 连接管理 API |
-| `backend/api/browser_api.go` | ~600 | 数据浏览 API（最大文件） |
-| `backend/api/cli_api.go` | 40 | CLI API |
-| `backend/api/monitor_api.go` | 45 | Monitor API |
-| `backend/api/pubsub_api.go` | 50 | Pubsub API |
-| `backend/api/preferences_api.go` | 55 | 偏好设置 API |
-| `backend/api/system_api.go` | 120 | 系统信息 + 文件上传下载 API |
+| `backend/api/router.go` | 165 | Gin 路由器（安全头、CORS、CSRF、静态文件），`//go:build web` |
+| `backend/api/auth.go` | 260 | 登录认证系统（Token、限速、中间件），`//go:build web` |
+| `backend/api/websocket_hub.go` | 120 | WebSocket 连接管理，`//go:build web` |
+| `backend/api/event_bridge.go` | 10 | 事件桥接辅助，`//go:build web` |
+| `backend/api/connection_api.go` | 170 | 连接管理 API，`//go:build web` |
+| `backend/api/browser_api.go` | ~600 | 数据浏览 API（最大文件），`//go:build web` |
+| `backend/api/cli_api.go` | 40 | CLI API，`//go:build web` |
+| `backend/api/monitor_api.go` | 45 | Monitor API，`//go:build web` |
+| `backend/api/pubsub_api.go` | 50 | Pubsub API，`//go:build web` |
+| `backend/api/preferences_api.go` | 55 | 偏好设置 API，`//go:build web` |
+| `backend/api/system_api.go` | 120 | 系统信息 + 文件上传下载 API，`//go:build web` |
 | `frontend/src/utils/api.js` | ~440 | HTTP API 适配器（~80 个导出函数） |
 | `frontend/src/utils/wails_runtime.js` | 80 | Wails Runtime Web 替代 |
 | `frontend/src/utils/websocket.js` | 110 | WebSocket 客户端 |
@@ -602,7 +654,8 @@ Web 版新增了移动端浏览器的基础适配：
 | `docker-compose.yml` | 18 | Docker Compose 配置 |
 | `docker/entrypoint.sh` | 10 | 容器入口脚本 |
 | `.dockerignore` | 10 | Docker 构建排除规则 |
-| `.github/workflows/docker-publish.yml` | 45 | CI/CD 自动构建推送 |
+| `.github/workflows/docker-publish.yml` | 45 | Docker 镜像自动构建推送（仅 release 触发） |
+| `.github/workflows/release-windows.yaml` | 120 | Windows 桌面应用构建 + 自签名证书签名 |
 | `DOCKER_WEB.md` | — | 本文档 |
 
 ---
@@ -748,19 +801,33 @@ func (c *connectionService) ImportConnectionsFromBytes(data []byte) (resp types.
 ```diff
  <script setup>
  // ... 原有 import 不变
-+import { ReconnectWebSocket } from 'wailsjs/runtime/runtime.js'
-+import LoginPage from '@/components/LoginPage.vue'
++import { h, onMounted, onUnmounted, ref, watch, defineAsyncComponent, shallowRef } from 'vue'
++
++// 编译时常量：完全分离桌面/Web 流程
++const isWebMode = import.meta.env.VITE_WEB === 'true'
++
++// Web-only: 懒加载 LoginPage，避免桌面模式引入 websocket.js
++const LoginPage = isWebMode ? defineAsyncComponent(() => import('@/components/LoginPage.vue')) : null
 
 +// Viewport 管理函数
 +const setViewport = (mode) => { ... }
 +
-+// Auth 状态
-+const authChecking = ref(true)
++// Auth 状态（桌面模式下 authChecking 初始为 false，直接跳过）
++const authChecking = ref(isWebMode)
 +const authenticated = ref(false)
 +const authEnabled = ref(false)
 +
 +const checkAuth = async () => { ... }
-+const onLogin = async () => { ... }
++const onLogin = async () => {
++    authenticated.value = true
++    setViewport('desktop')
++    // 动态导入避免桌面模式引入 Web 依赖
++    try {
++        const runtime = await import('wailsjs/runtime/runtime.js')
++        if (runtime.ReconnectWebSocket) runtime.ReconnectWebSocket()
++    } catch {}
++    await initApp()
++}
 +const onUnauthorized = () => { ... }
 
 -onMounted(async () => {
@@ -775,8 +842,10 @@ func (c *connectionService) ImportConnectionsFromBytes(data []byte) (resp types.
 +const initApp = async () => {
 +    try {
 +        initializing.value = true
-+        await prefStore.loadPreferences()          // 新增：先加载偏好
-+        i18n.locale.value = prefStore.currentLanguage // 新增：同步语言
++        if (isWebMode) {
++            await prefStore.loadPreferences()          // Web: 先加载偏好
++            i18n.locale.value = prefStore.currentLanguage // Web: 同步语言
++        }
 +        await prefStore.loadFontList()
 +        // ... 原始初始化逻辑
 +    } finally {
@@ -785,15 +854,21 @@ func (c *connectionService) ImportConnectionsFromBytes(data []byte) (resp types.
 +}
 +
 +onMounted(async () => {
-+    window.addEventListener('rdm:unauthorized', onUnauthorized)
-+    window.addEventListener('orientationchange', onOrientationChange)
-+    window.addEventListener('resize', onOrientationChange)
-+    await checkAuth()
-+    if (authenticated.value || !authEnabled.value) {
-+        setViewport('desktop')
-+        await initApp()
++    if (isWebMode) {
++        // Web 模式：注册事件监听 + 认证流程
++        window.addEventListener('rdm:unauthorized', onUnauthorized)
++        window.addEventListener('orientationchange', onOrientationChange)
++        window.addEventListener('resize', onOrientationChange)
++        await checkAuth()
++        if (authenticated.value || !authEnabled.value) {
++            setViewport('desktop')
++            await initApp()
++        } else {
++            setViewport('mobile')
++        }
 +    } else {
-+        setViewport('mobile')
++        // 桌面模式：直接初始化，与原版行为一致
++        await initApp()
 +    }
 +})
  </script>
@@ -804,11 +879,11 @@ func (c *connectionService) ImportConnectionsFromBytes(data []byte) (resp types.
 -            <app-content :loading="initializing" />
 -            <!-- dialogs -->
 -        </n-dialog-provider>
-+        <template v-if="authChecking">
++        <template v-if="isWebMode && authChecking">
 +            <div style="width: 100vw; height: 100vh"></div>
 +        </template>
-+        <template v-else-if="authEnabled && !authenticated">
-+            <login-page @login="onLogin" />
++        <template v-else-if="isWebMode && authEnabled && !authenticated">
++            <component :is="LoginPage" @login="onLogin" />
 +        </template>
 +        <template v-else>
 +            <n-dialog-provider>
@@ -898,6 +973,37 @@ func (c *connectionService) ImportConnectionsFromBytes(data []byte) (resp types.
 +export function isWeb() {
 +    return os === 'web'
 +}
+```
+
+### `frontend/src/components/content_value/ContentCli.vue`
+
+```diff
+ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+ import 'xterm/css/xterm.css'
+-import { EventsEmit, EventsOff, EventsOn, WaitForWebSocket } from 'wailsjs/runtime/runtime.js'
++import { EventsEmit, EventsOff, EventsOn } from 'wailsjs/runtime/runtime.js'
+
+ onMounted(async () => {
+     // ...
+     EventsOn(`cmd:output:${props.name}`, receiveTermOutput)
+
++    // Web 模式：动态导入 WaitForWebSocket（桌面模式跳过，Wails runtime 不导出此函数）
++    if (import.meta.env.VITE_WEB === 'true') {
++        try {
++            const { WaitForWebSocket } = await import('wailsjs/runtime/runtime.js')
++            await Promise.race([
++                WaitForWebSocket(),
++                new Promise((_, reject) => setTimeout(() => reject(new Error('ws timeout')), 5000)),
++            ])
++        } catch {
++            console.warn('[cli] WebSocket not connected, some features may be limited')
++        }
++    }
++
+     await CloseCli(props.name)
+     await StartCli(props.name, 0)
+     // ...
+ })
 ```
 
 ### `frontend/index.html`
