@@ -155,14 +155,18 @@ const handleLogin = async () => {
     align-items: center;
     justify-content: center;
     background-color: v-bind('themeVars.bodyColor');
+    padding: 16px;
+    box-sizing: border-box;
 }
 
 .login-card {
     width: 360px;
+    max-width: 100%;
     padding: 40px 36px 36px;
     border-radius: 8px;
     border: 1px solid v-bind('themeVars.borderColor');
     background-color: v-bind('themeVars.cardColor');
+    box-sizing: border-box;
 }
 
 .login-header {
@@ -208,6 +212,27 @@ const handleLogin = async () => {
     &:hover {
         opacity: 1;
         text-decoration: underline;
+    }
+}
+
+@media (max-width: 480px) {
+    .login-wrapper {
+        align-items: flex-start;
+        padding-top: 15vh;
+    }
+
+    .login-card {
+        padding: 28px 20px 24px;
+        border: none;
+        border-radius: 12px;
+    }
+
+    .login-header {
+        margin-bottom: 24px;
+    }
+
+    .login-footer {
+        bottom: 12px;
     }
 }
 </style>

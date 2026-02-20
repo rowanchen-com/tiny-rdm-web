@@ -30,6 +30,17 @@ const connectionStore = useConnectionStore()
 const i18n = useI18n()
 const initializing = ref(true)
 
+// Viewport management for mobile: login page uses responsive, app uses desktop layout
+const setViewport = (mode) => {
+    const meta = document.querySelector('meta[name="viewport"]')
+    if (!meta) return
+    if (mode === 'mobile') {
+        meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
+    } else {
+        meta.setAttribute('content', 'width=1024, initial-scale=0, shrink-to-fit=yes')
+    }
+}
+
 // Auth state
 const authChecking = ref(true)
 const authenticated = ref(false)
@@ -52,6 +63,7 @@ const checkAuth = async () => {
 
 const onLogin = async () => {
     authenticated.value = true
+    setViewport('desktop')
     // Reconnect WebSocket with auth cookie now available (non-blocking)
     ReconnectWebSocket()
     await initApp()
@@ -130,6 +142,7 @@ const initApp = async () => {
 const onUnauthorized = () => {
     if (authEnabled.value) {
         authenticated.value = false
+        setViewport('mobile')
     }
 }
 
@@ -137,7 +150,10 @@ onMounted(async () => {
     window.addEventListener('rdm:unauthorized', onUnauthorized)
     await checkAuth()
     if (authenticated.value) {
+        setViewport('desktop')
         await initApp()
+    } else {
+        setViewport('mobile')
     }
 })
 
