@@ -81,12 +81,68 @@ export function SaveRefreshInterval(name, interval) {
     return post('/connection/save-refresh-interval', { name, interval })
 }
 
-export function ExportConnections() {
-    return post('/connection/export')
+export async function ExportConnections() {
+    // Web mode: trigger browser download of connections zip
+    try {
+        const resp = await fetch(`${API_BASE}/connection/export-download`, {
+            credentials: 'same-origin',
+        })
+        if (resp.status === 401) {
+            window.dispatchEvent(new Event('rdm:unauthorized'))
+            return { success: false, msg: 'unauthorized' }
+        }
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}))
+            return { success: false, msg: err.msg || 'export failed' }
+        }
+        const blob = await resp.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        const disposition = resp.headers.get('Content-Disposition') || ''
+        const match = disposition.match(/filename=(.+)/)
+        a.download = match ? match[1] : 'connections.zip'
+        a.href = url
+        a.click()
+        URL.revokeObjectURL(url)
+        return { success: true, data: { path: '' } }
+    } catch {
+        return { success: false, msg: 'export failed' }
+    }
 }
 
-export function ImportConnections() {
-    return post('/connection/import')
+export async function ImportConnections() {
+    // Web mode: open file picker, upload zip to backend
+    return new Promise((resolve) => {
+        const input = document.createElement('input')
+        input.type = 'file'
+        input.accept = '.zip'
+        input.onchange = async () => {
+            if (input.files && input.files[0]) {
+                const formData = new FormData()
+                formData.append('file', input.files[0])
+                try {
+                    const resp = await fetch(`${API_BASE}/connection/import-upload`, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        body: formData,
+                    })
+                    if (resp.status === 401) {
+                        window.dispatchEvent(new Event('rdm:unauthorized'))
+                        resolve({ success: false, msg: 'unauthorized' })
+                        return
+                    }
+                    resolve(await resp.json())
+                } catch {
+                    resolve({ success: false, msg: 'import failed' })
+                }
+            } else {
+                resolve({ success: false, msg: '' })
+            }
+        }
+        // User cancelled file picker
+        input.addEventListener('cancel', () => resolve({ success: false, msg: '' }))
+        input.click()
+    })
 }
 
 export function ParseConnectURL(url) {

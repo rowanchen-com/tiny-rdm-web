@@ -1,6 +1,8 @@
 package api
 
 import (
+	"fmt"
+	"io"
 	"net/http"
 	"tinyrdm/backend/services"
 	"tinyrdm/backend/types"
@@ -116,6 +118,43 @@ func registerConnectionRoutes(rg *gin.RouterGroup) {
 
 	g.POST("/import", func(c *gin.Context) {
 		c.JSON(http.StatusOK, services.Connection().ImportConnections())
+	})
+
+	// Web-specific: download connections as zip file
+	g.GET("/export-download", func(c *gin.Context) {
+		data, filename, err := services.Connection().ExportConnectionsToBytes()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, types.JSResp{Msg: "export failed"})
+			return
+		}
+		c.Header("Content-Disposition", "attachment; filename="+filename)
+		c.Header("Content-Type", "application/zip")
+		c.Header("Content-Length", fmt.Sprintf("%d", len(data)))
+		c.Data(http.StatusOK, "application/zip", data)
+	})
+
+	// Web-specific: import connections from uploaded zip file
+	g.POST("/import-upload", func(c *gin.Context) {
+		file, err := c.FormFile("file")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, types.JSResp{Msg: "invalid file"})
+			return
+		}
+		src, err := file.Open()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, types.JSResp{Msg: "failed to read file"})
+			return
+		}
+		defer src.Close()
+
+		data, err := io.ReadAll(src)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, types.JSResp{Msg: "failed to read file"})
+			return
+		}
+
+		resp := services.Connection().ImportConnectionsFromBytes(data)
+		c.JSON(http.StatusOK, resp)
 	})
 
 	g.POST("/list-sentinel-masters", func(c *gin.Context) {
