@@ -3,7 +3,7 @@ import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import 'xterm/css/xterm.css'
-import { EventsEmit, EventsOff, EventsOn, WaitForWebSocket } from 'wailsjs/runtime/runtime.js'
+import { EventsEmit, EventsOff, EventsOn } from 'wailsjs/runtime/runtime.js'
 import { get, isEmpty, set, size, trim } from 'lodash'
 import { CloseCli, StartCli } from 'wailsjs/go/services/cliService.js'
 import usePreferencesStore from 'stores/preferences.js'
@@ -95,15 +95,17 @@ onMounted(async () => {
 
     EventsOn(`cmd:output:${props.name}`, receiveTermOutput)
 
-    // Wait for WebSocket with timeout (CLI needs it for real-time I/O)
-    try {
-        await Promise.race([
-            WaitForWebSocket(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('ws timeout')), 5000)),
-        ])
-    } catch {
-        // WebSocket not available, CLI will work via HTTP fallback
-        console.warn('[cli] WebSocket not connected, some features may be limited')
+    // Wait for WebSocket with timeout (CLI needs it for real-time I/O, web mode only)
+    if (import.meta.env.VITE_WEB === 'true') {
+        try {
+            const { WaitForWebSocket } = await import('wailsjs/runtime/runtime.js')
+            await Promise.race([
+                WaitForWebSocket(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('ws timeout')), 5000)),
+            ])
+        } catch {
+            console.warn('[cli] WebSocket not connected, some features may be limited')
+        }
     }
 
     await CloseCli(props.name)
