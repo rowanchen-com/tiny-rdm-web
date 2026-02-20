@@ -1,13 +1,14 @@
 /* Mobile responsive overrides for Tiny RDM Web */
 /* Only affects screens <= 768px, does NOT modify any original component code */
+/* All original features preserved - layout adapted for touch screens */
 
 @media screen and (max-width: 768px) {
-    /* Use dynamic viewport height to account for mobile browser chrome */
+    /* ===== Base: dynamic viewport height ===== */
     #app {
         height: 100dvh;
     }
 
-    /* ===== Main wrapper: no border radius, full screen ===== */
+    /* ===== Main wrapper ===== */
     #app-content-wrapper {
         height: 100dvh !important;
         width: 100vw !important;
@@ -18,40 +19,39 @@
         overflow: hidden;
     }
 
-    /* ===== Toolbar: compact for mobile ===== */
+    /* ===== Toolbar ===== */
     #app-toolbar {
         height: 40px !important;
         min-height: 40px;
         flex-shrink: 0;
 
+        /* Title area: compact */
         #app-toolbar-title {
             width: auto !important;
             min-width: auto !important;
             padding-left: 8px !important;
             padding-right: 4px !important;
+            flex-shrink: 0;
 
-            /* Smaller logo */
             .n-avatar {
                 width: 24px !important;
                 height: 24px !important;
                 min-width: 24px !important;
-                font-size: 24px !important;
             }
 
-            /* Smaller title text */
             div[style*="font-weight: 800"] {
                 font-size: 13px !important;
                 min-width: auto !important;
             }
 
-            /* Connection name: truncate more aggressively */
+            /* Connection subtitle: compact */
             .n-text.ellipsis {
-                max-width: 80px;
+                max-width: 60px;
                 font-size: 11px !important;
             }
         }
 
-        /* Browser tabs: scrollable horizontal strip */
+        /* Browser tabs: horizontal scroll */
         .app-toolbar-tab {
             flex: 1;
             min-width: 0;
@@ -59,139 +59,129 @@
             overflow-y: hidden !important;
             -webkit-overflow-scrolling: touch;
             scrollbar-width: none;
-
             &::-webkit-scrollbar {
                 display: none;
             }
         }
     }
 
-    /* ===== Content area: vertical stacking ===== */
+    /* ===== Main content area ===== */
     #app-content {
         flex: 1;
         height: 0 !important;
-        display: flex;
-        flex-direction: row;
         overflow: hidden;
+        /* Reserve space for bottom nav */
+        padding-bottom: 50px;
+    }
 
-        /* Ribbon: move to bottom as horizontal bar */
-        #app-ribbon {
-            position: fixed !important;
-            bottom: 0 !important;
-            left: 0 !important;
-            right: 0 !important;
-            width: 100% !important;
-            min-width: 100% !important;
-            height: 48px !important;
+    /* ===== Ribbon → bottom navigation bar ===== */
+    #app-ribbon {
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        top: auto !important;
+        width: 100% !important;
+        min-width: 100% !important;
+        height: 50px !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        border-right: none !important;
+        border-top: 1px solid var(--n-border-color, #efeff5);
+        z-index: 200;
+        padding: 0 !important;
+        box-sizing: border-box;
+
+        /* Nav items: horizontal */
+        .ribbon-wrapper {
             flex-direction: row !important;
-            align-items: center !important;
-            justify-content: center !important;
-            border-right: none !important;
-            border-top: 1px solid var(--n-border-color, #efeff5);
-            z-index: 100;
+            flex: 1;
+            margin-top: 0 !important;
             padding: 0 4px !important;
-            box-sizing: border-box;
+            justify-content: center !important;
+            align-items: center !important;
+            gap: 0 !important;
 
-            /* Main nav items: horizontal row */
-            .ribbon-wrapper {
-                flex-direction: row !important;
-                flex: 0 0 auto;
-                margin-top: 0 !important;
-                padding-right: 0 !important;
-                justify-content: center !important;
-                align-items: center !important;
-                gap: 0 !important;
+            .ribbon-item {
+                padding: 8px 14px !important;
+                width: auto !important;
 
-                .ribbon-item {
-                    padding: 6px 10px !important;
-                    width: auto !important;
-
-                    /* Active indicator: bottom line instead of left line */
-                    &:hover::before,
-                    &.ribbon-item-active::before {
-                        width: 60% !important;
-                        height: 3px !important;
-                        left: 20% !important;
-                        right: 20% !important;
-                        top: auto !important;
-                        bottom: 0 !important;
-                    }
-                }
-            }
-
-            /* Spacer: thin divider */
-            & > .flex-item-expand {
-                flex: 0 0 1px !important;
-                width: 1px;
-                min-width: 1px !important;
-                height: 24px;
-                margin: 0 2px;
-                background-color: var(--n-border-color, #efeff5);
-            }
-
-            /* Bottom menu items: horizontal, compact */
-            .nav-menu-item {
-                flex-direction: row !important;
-                flex: 0 0 auto;
-                padding: 0 !important;
-                gap: 0 !important;
-                align-items: center !important;
-
-                button {
-                    margin: 0 2px !important;
+                /* Active/hover indicator: bottom line */
+                &:hover::before,
+                &.ribbon-item-active::before {
+                    width: 60% !important;
+                    height: 3px !important;
+                    left: 20% !important;
+                    right: 20% !important;
+                    top: auto !important;
+                    bottom: 0 !important;
+                    border-radius: 3px 3px 0 0 !important;
                 }
             }
         }
 
-        /* Content areas: vertical stacking */
-        .content-area {
-            flex-direction: column !important;
-            overflow: hidden !important;
+        /* Spacer between nav and tools */
+        & > .flex-item-expand {
+            flex: 0 0 auto !important;
+            width: 1px;
+            min-width: 1px !important;
+            height: 28px;
+            margin: 0 2px;
+            background-color: var(--n-border-color, #efeff5);
+        }
 
-            /* Sidebar wrapper: full width, limited height */
-            .resize-wrapper {
-                width: 100% !important;
-                height: 40vh !important;
-                min-height: 100px;
-                max-height: 40vh;
-                flex-shrink: 0;
-                overflow: hidden;
-                border-bottom: 1px solid var(--n-border-color, #efeff5);
+        /* Tool icons row: settings, wechat/twitter, github, logout */
+        .nav-menu-item {
+            flex-direction: row !important;
+            flex: 0 0 auto;
+            padding: 0 4px !important;
+            gap: 0 !important;
+            align-items: center !important;
 
-                /* Hide resize drag handle on mobile */
-                .resize-divider {
-                    display: none !important;
-                }
-            }
-
-            /* App sidebar: full width, no right border */
-            .app-side {
-                width: 100% !important;
-                border-right: none !important;
-            }
-
-            /* Main content: fill remaining space */
-            & > .flex-item-expand {
-                flex: 1;
-                min-height: 0;
-                overflow: auto;
-                -webkit-overflow-scrolling: touch;
+            button {
+                margin: 0 3px !important;
             }
         }
     }
 
-    /* Bottom padding for content to not be hidden behind bottom nav */
-    #app-content {
-        padding-bottom: 48px;
+    /* ===== Content areas: vertical stacking ===== */
+    .content-area {
+        flex-direction: column !important;
+        overflow: hidden !important;
+        height: 100% !important;
+
+        /* Sidebar: full width, top portion */
+        .resize-wrapper {
+            width: 100% !important;
+            height: 38vh !important;
+            min-height: 80px;
+            max-height: 38vh;
+            flex: 0 0 38vh !important;
+            overflow: hidden;
+            border-bottom: 1px solid var(--n-border-color, #efeff5);
+
+            /* Hide drag handle */
+            .resize-divider {
+                display: none !important;
+            }
+        }
+
+        .app-side {
+            width: 100% !important;
+            border-right: none !important;
+        }
+
+        /* Content pane: fill remaining */
+        & > .flex-item-expand {
+            flex: 1 !important;
+            min-height: 0;
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
+        }
     }
 
-    /* ===== Spin wrapper: no border radius ===== */
-    .n-spin-container,
-    .n-spin-content {
-        border-radius: 0 !important;
-    }
-
-    /* ===== Connection pane bottom bar ===== */
+    /* ===== Connection pane bottom toolbar ===== */
     .nav-pane-container {
         .nav-pane-func {
             flex-wrap: nowrap;
@@ -200,31 +190,75 @@
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
             scrollbar-width: none;
-
             &::-webkit-scrollbar {
                 display: none;
             }
 
-            /* Filter input: smaller on mobile */
             .n-input {
-                min-width: 80px;
+                min-width: 60px;
                 flex: 1;
             }
         }
     }
 
-    /* ===== Dialogs: nearly full width on mobile ===== */
-    .n-modal {
-        width: 94vw !important;
-        max-width: 94vw !important;
-    }
-
+    /* ===== Dialogs: full width, tabs top ===== */
+    .n-modal,
     .n-dialog {
         width: 94vw !important;
         max-width: 94vw !important;
+        max-height: 90dvh !important;
+        margin: 0 auto;
     }
 
-    /* ===== Content value area: optimize for mobile ===== */
+    /* Fix PreferencesDialog left-tabs overlap: switch to top tabs */
+    .n-tabs.n-tabs--left-type {
+        flex-direction: column !important;
+
+        .n-tabs-nav--left-type {
+            flex-direction: row !important;
+            width: 100% !important;
+            min-width: 0 !important;
+            border-right: none !important;
+            border-bottom: 1px solid var(--n-border-color, #efeff5);
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            &::-webkit-scrollbar {
+                display: none;
+            }
+
+            .n-tabs-tab {
+                justify-content: center !important;
+                padding: 8px 12px !important;
+            }
+
+            /* Tab bar indicator: horizontal */
+            .n-tabs-bar {
+                left: 0 !important;
+                right: auto !important;
+                bottom: 0 !important;
+                top: auto !important;
+                width: auto !important;
+                height: 2px !important;
+            }
+        }
+
+        .n-tabs-pane-wrapper,
+        .n-tab-pane {
+            width: 100% !important;
+            min-height: 200px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+    }
+
+    /* Dialog action buttons: wrap if needed */
+    .n-dialog__action {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    /* ===== Content value area ===== */
     .content-wrapper {
         .tb2 {
             flex-wrap: wrap;
@@ -234,35 +268,68 @@
         .value-footer {
             flex-wrap: wrap;
             height: auto !important;
-            min-height: 30px;
+            min-height: 28px;
             padding: 3px 6px !important;
+            gap: 4px;
         }
     }
 
-    /* ===== General touch improvements ===== */
-    * {
-        -webkit-tap-highlight-color: transparent;
-    }
-
-    /* Smooth scrolling for all scrollable areas */
-    .n-scrollbar-container,
-    .n-virtual-list,
-    .n-data-table-base-table-body {
-        -webkit-overflow-scrolling: touch;
-    }
-
-    /* ===== Content editor area ===== */
     .content-container {
         padding: 4px !important;
     }
 
-    /* ===== Server status cards: wrap on mobile ===== */
-    .server-status {
-        flex-wrap: wrap;
+    /* ===== Form grids: single column on mobile ===== */
+    .n-grid {
+        display: flex !important;
+        flex-direction: column !important;
+
+        .n-form-item-gi,
+        .n-gi {
+            grid-column: span 24 !important;
+            width: 100% !important;
+        }
+    }
+
+    /* ===== Data tables: horizontal scroll ===== */
+    .n-data-table {
+        .n-data-table-base-table {
+            min-width: 400px;
+        }
+
+        .n-data-table-base-table-body {
+            -webkit-overflow-scrolling: touch;
+        }
+    }
+
+    .n-data-table-wrapper {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* ===== Spin wrapper: no radius ===== */
+    .n-spin-container,
+    .n-spin-content {
+        border-radius: 0 !important;
+    }
+
+    /* ===== Touch improvements ===== */
+    * {
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .n-scrollbar-container,
+    .n-virtual-list {
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* ===== Notification/message: don't overflow ===== */
+    .n-notification-container {
+        max-width: 90vw !important;
+        right: 5vw !important;
     }
 }
 
-/* Tablet: just remove border radius */
+/* ===== Tablet: just remove border radius ===== */
 @media screen and (min-width: 769px) and (max-width: 1024px) {
     #app-content-wrapper {
         border-radius: 0 !important;
