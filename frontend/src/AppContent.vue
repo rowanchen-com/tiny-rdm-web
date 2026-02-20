@@ -240,10 +240,12 @@ const onKeyShortcut = (e) => {
 #app-content-wrapper {
     width: 100vw;
     height: 100vh;
-    overflow: hidden;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
     box-sizing: border-box;
     background-color: v-bind('themeVars.bodyColor');
     color: v-bind('themeVars.textColorBase');
+    touch-action: manipulation;
 
     #app-toolbar {
         background-color: v-bind('exThemeVars.titleColor');
