@@ -104,15 +104,14 @@ jobs:
           -nsis -webview2 embed \
           -ldflags "-X main.version=v${{ steps.normalise_version.outputs.version }}"
 
-      - name: Sign the installer
-        if: env.WIN_SIGNING_CERT != ''
-        uses: dlemstra/code-sign-action@v1
-        env:
-          WIN_SIGNING_CERT: ${{ secrets.WIN_SIGNING_CERT }}
-        with:
-          certificate: ${{ secrets.WIN_SIGNING_CERT }}
-          password: ${{ secrets.WIN_SIGNING_CERT_PASSWORD }}
-          folder: ./build/bin
+      - name: Create self-signed certificate and sign installer
+        shell: pwsh
+        run: |
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=Tiny RDM" -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddYears(10)
+          $password = ConvertTo-SecureString -String "TinyRDM2024" -Force -AsPlainText
+          Export-PfxCertificate -Cert $cert -FilePath cert.pfx -Password $password
+          $exePath = (Get-ChildItem ./build/bin/*.exe).FullName
+          Set-AuthenticodeSignature -FilePath $exePath -Certificate $cert -TimestampServer "http://timestamp.digicert.com"
 
       - name: Rename installer
         working-directory: ./build/bin

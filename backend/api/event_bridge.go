@@ -1,3 +1,5 @@
+//go:build web
+
 package api
 
 // EmitEvent sends an event to all connected WebSocket clients.
