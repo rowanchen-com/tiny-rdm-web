@@ -37,9 +37,9 @@ const setViewport = (mode) => {
     if (mode === 'mobile') {
         meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
     } else {
-        // Fixed desktop width - browser auto-scales to fit screen
-        // 1024px is wide enough for the desktop UI to render properly
-        meta.setAttribute('content', 'width=1024, user-scalable=yes')
+        // Desktop/app mode: use device-width for responsive layout
+        // Mobile CSS overrides handle the layout adaptation
+        meta.setAttribute('content', 'width=device-width, initial-scale=1.0, user-scalable=no')
     }
 }
 

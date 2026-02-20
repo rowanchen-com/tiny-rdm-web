@@ -240,7 +240,6 @@ const onKeyShortcut = (e) => {
 #app-content-wrapper {
     width: 100vw;
     height: 100vh;
-    height: 100dvh;
     overflow: hidden;
     box-sizing: border-box;
     background-color: v-bind('themeVars.bodyColor');
