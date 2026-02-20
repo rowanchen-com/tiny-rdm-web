@@ -38,8 +38,11 @@ const setViewport = (mode) => {
         // Login page: responsive for mobile
         meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
     } else {
-        // App page: show PC layout, auto-scale to fit, allow pinch zoom
-        meta.setAttribute('content', 'width=1024, user-scalable=yes')
+        // App page: PC layout scaled to fit screen, pinch zoom enabled
+        // Use smaller width on portrait screens so content appears larger
+        const ratio = (window.innerWidth || screen.width) / (window.innerHeight || screen.height)
+        const vw = ratio < 1 ? 860 : 1024
+        meta.setAttribute('content', `width=${vw}, user-scalable=yes`)
     }
 }
 
