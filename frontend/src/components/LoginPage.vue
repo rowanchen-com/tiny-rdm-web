@@ -181,6 +181,7 @@ const handleLogin = async () => {
     font-size: 22px;
     font-weight: 800;
     margin-top: 4px;
+    color: v-bind('themeVars.textColor1');
 }
 
 .login-form {
