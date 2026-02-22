@@ -431,8 +431,8 @@ const useConnectionStore = defineStore('connections', {
             if (!success) {
                 if (!isEmpty(msg)) {
                     $message.error(msg)
-                    return
                 }
+                return
             }
 
             $message.success(i18nGlobal.t('dialogue.handle_succ'))
@@ -447,8 +447,8 @@ const useConnectionStore = defineStore('connections', {
             if (!success) {
                 if (!isEmpty(msg)) {
                     $message.error(msg)
-                    return
                 }
+                return
             }
 
             $message.success(i18nGlobal.t('dialogue.handle_succ'))
