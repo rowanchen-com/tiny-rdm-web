@@ -272,6 +272,8 @@ Web 编译 (web):   main_web.go → services/*.go + platform_web.go → 回调 �
 
 **`go.mod`** — 新增 `github.com/gin-gonic/gin v1.10.1` direct 依赖（`gorilla/websocket` 已是原版 indirect 依赖）。Gin 引入的 indirect 依赖包括 `bytedance/sonic`、`go-playground/validator`、`goccy/go-json`、`ugorji/go/codec`、`google.golang.org/protobuf` 等。
 
+**`backend/storage/local_storage.go`** — 文件/目录创建权限从 `0777` 改为 `0600`（文件）/ `0700`（目录），安全加固。
+
 **7 个 Service 文件** — 统一替换模式：
 
 ```go
@@ -343,6 +345,10 @@ services.EventsEmit(s.ctx, "event_name", data)
 **`ContentCli.vue`** — `WaitForWebSocket` 从静态导入改为 `import.meta.env.VITE_WEB` 条件动态导入（Wails runtime 不导出此函数，静态导入会导致桌面构建失败）。
 
 **`connections.js` (store)** — 修复 `exportConnections()` / `importConnections()` 取消操作时仍显示"操作成功"的 bug（`return` 移到外层 `if (!success)`）。
+
+**`style.scss`** — 新增 `overscroll-behavior: none`（禁止页面过度滚动弹性效果）+ `height: 100dvh`（动态视口高度）。
+
+**`frontend/src/langs/*.json`（10 个语言文件）** — 每个文件新增 `"logout"` 翻译键（zh/tw/en/ja/ko/es/fr/ru/pt/tr），用于侧边栏退出按钮。
 
 **`index.html`** — 新增 `<link rel="icon" href="/favicon.png" />`。
 
@@ -514,12 +520,13 @@ FROM alpine:3.21
 
 ## 完整文件清单
 
-### 修改的原始文件
+### 修改的原始文件（30 个）
 
 | 文件 | 改动说明 | 改动量 |
 |---|---|---|
 | `main.go` | 添加 `//go:build !web` | +1 行 |
-| `go.mod` / `go.sum` | 新增 gin 依赖 | ~30 行 |
+| `go.mod` | 新增 gin direct 依赖 | ~5 行 |
+| `go.sum` | 新增依赖校验和 | ~25 行 |
 | `backend/services/browser_service.go` | `runtime.*` → `services.*` | ~15 处 |
 | `backend/services/cli_service.go` | 同上 | ~5 处 |
 | `backend/services/connection_service.go` | 同上 | ~10 处 |
@@ -527,16 +534,19 @@ FROM alpine:3.21
 | `backend/services/pubsub_service.go` | 同上 | ~5 处 |
 | `backend/services/preferences_service.go` | 同上 | ~3 处 |
 | `backend/services/system_service.go` | 同上 | ~3 处 |
+| `backend/storage/local_storage.go` | 文件权限 `0777` → `0600`/`0700`（安全加固） | 2 处 |
 | `frontend/vite.config.js` | 条件别名 + proxy | +30 行 |
 | `frontend/src/App.vue` | 认证门控 + viewport + 双模式分离 | 重写 |
 | `frontend/src/AppContent.vue` | 隐藏窗口按钮 + `isWeb()` + `100dvh` | +10 行 |
 | `frontend/src/components/sidebar/Ribbon.vue` | 退出登录按钮 | +15 行 |
 | `frontend/src/utils/platform.js` | 新增 `isWeb()` | +3 行 |
+| `frontend/src/assets/styles/style.scss` | `overscroll-behavior: none` + `height: 100dvh` | +2 行 |
 | `frontend/src/components/content_value/ContentCli.vue` | `WaitForWebSocket` 动态导入 | +15 行 |
 | `frontend/src/stores/connections.js` | 修复取消操作误显示成功 | 2 处 |
 | `frontend/index.html` | favicon | +1 行 |
+| `frontend/src/langs/*.json`（10 个语言文件） | 每个文件新增 `"logout"` 翻译键 | 每文件 +1 行 |
 
-### 新增文件
+### 新增文件（27 个）
 
 | 文件 | 行数 | 说明 |
 |---|---|---|
@@ -560,12 +570,19 @@ FROM alpine:3.21
 | `frontend/src/components/LoginPage.vue` | 200 | 登录页面 |
 | `frontend/src/components/icons/Logout.vue` | 35 | 退出图标 |
 | `frontend/public/favicon.png` | — | 浏览器图标 |
+| `DOCKER_WEB.md` | ~470 | 本文档 |
 | `Dockerfile` | 40 | 三阶段构建 |
 | `docker-compose.yml` | 18 | 部署配置 |
 | `docker/entrypoint.sh` | 10 | 入口脚本 |
 | `.dockerignore` | 10 | 构建排除 |
 | `.github/workflows/docker-publish.yml` | 45 | Docker 镜像发布 |
 | `.github/workflows/release-windows.yaml` | 120 | Windows 桌面发布 |
+
+### 删除的原始文件（1 个）
+
+| 文件 | 说明 |
+|---|---|
+| `frontend/package.json.md5` | 原版存在，当前版本已删除（无实际用途） |
 
 ---
 
