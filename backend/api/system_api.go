@@ -78,32 +78,6 @@ func registerSystemRoutes(rg *gin.RouterGroup) {
 		})
 	})
 
-	// Web replacement for native file dialog - upload file
-	g.POST("/upload", func(c *gin.Context) {
-		file, err := c.FormFile("file")
-		if err != nil {
-			c.JSON(http.StatusBadRequest, types.JSResp{Msg: "invalid file upload"})
-			return
-		}
-
-		// Sanitize filename to prevent path traversal
-		safeName := sanitizeFilename(file.Filename)
-		tmpDir := os.TempDir()
-		dst := filepath.Join(tmpDir, safeName)
-
-		if err := c.SaveUploadedFile(file, dst); err != nil {
-			c.JSON(http.StatusInternalServerError, types.JSResp{Msg: "failed to save file"})
-			return
-		}
-
-		c.JSON(http.StatusOK, types.JSResp{
-			Success: true,
-			Data: map[string]any{
-				"path": dst,
-			},
-		})
-	})
-
 	// Web replacement for native file dialog - download file
 	g.GET("/download", func(c *gin.Context) {
 		reqPath := c.Query("path")

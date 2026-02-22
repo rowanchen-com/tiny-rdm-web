@@ -30,6 +30,17 @@ async function get(path, params = {}) {
     return resp.json()
 }
 
+async function del(path, params = {}) {
+    const query = new URLSearchParams(params).toString()
+    const url = query ? `${API_BASE}${path}?${query}` : `${API_BASE}${path}`
+    const resp = await fetch(url, { method: 'DELETE', credentials: 'same-origin' })
+    if (resp.status === 401) {
+        window.dispatchEvent(new Event('rdm:unauthorized'))
+        return { success: false, msg: 'unauthorized' }
+    }
+    return resp.json()
+}
+
 // ==================== Connection Service ====================
 
 export function ListConnection() {
@@ -53,9 +64,7 @@ export function TestConnection(param) {
 }
 
 export function DeleteConnection(name) {
-    return fetch(`${API_BASE}/connection/delete?name=${encodeURIComponent(name)}`, { method: 'DELETE' }).then((r) =>
-        r.json(),
-    )
+    return del('/connection/delete', { name })
 }
 
 export function CreateGroup(name) {
@@ -67,10 +76,7 @@ export function RenameGroup(name, newName) {
 }
 
 export function DeleteGroup(name, includeConn) {
-    return fetch(
-        `${API_BASE}/connection/group/delete?name=${encodeURIComponent(name)}&includeConn=${includeConn}`,
-        { method: 'DELETE' },
-    ).then((r) => r.json())
+    return del('/connection/group/delete', { name, includeConn })
 }
 
 export function SaveLastDB(name, db) {
@@ -373,10 +379,6 @@ export function CheckForUpdate() {
 
 // ==================== System Service ====================
 
-export function GetSystemInfo() {
-    return get('/system/info')
-}
-
 // Alias used in App.vue
 export function Info() {
     return get('/system/info')
@@ -394,13 +396,26 @@ export async function SelectFile(title, ext) {
             if (input.files && input.files[0]) {
                 const formData = new FormData()
                 formData.append('file', input.files[0])
-                const resp = await fetch('/api/system/select-file', { method: 'POST', body: formData })
-                const result = await resp.json()
-                resolve(result)
+                try {
+                    const resp = await fetch('/api/system/select-file', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        body: formData,
+                    })
+                    if (resp.status === 401) {
+                        window.dispatchEvent(new Event('rdm:unauthorized'))
+                        resolve({ success: false, msg: 'unauthorized' })
+                        return
+                    }
+                    resolve(await resp.json())
+                } catch {
+                    resolve({ success: false, msg: 'upload failed' })
+                }
             } else {
-                resolve({ success: false, msg: 'no file selected' })
+                resolve({ success: false, msg: '' })
             }
         }
+        input.addEventListener('cancel', () => resolve({ success: false, msg: '' }))
         input.click()
     })
 }
@@ -411,27 +426,4 @@ export async function SaveFile(title, defaultName, ext) {
     return { success: true, data: { path: '' } }
 }
 
-// ==================== Auth ====================
 
-export async function AuthStatus() {
-    const resp = await fetch('/api/auth/status', { credentials: 'same-origin' })
-    return resp.json()
-}
-
-export async function AuthLogin(username, password) {
-    const resp = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ username, password }),
-    })
-    return { status: resp.status, ...(await resp.json()) }
-}
-
-export async function AuthLogout() {
-    const resp = await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'same-origin',
-    })
-    return resp.json()
-}
