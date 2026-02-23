@@ -110,15 +110,25 @@ jobs:
           $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=Tiny RDM" -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddYears(10)
           $password = ConvertTo-SecureString -String "TinyRDM2024" -Force -AsPlainText
           Export-PfxCertificate -Cert $cert -FilePath cert.pfx -Password $password
-          $exePath = (Get-ChildItem ./build/bin/*installer.exe).FullName
-          Set-AuthenticodeSignature -FilePath $exePath -Certificate $cert -TimestampServer "http://timestamp.digicert.com"
+          $installer = Get-ChildItem ./build/bin/*-installer.exe | Select-Object -First 1
+          if ($installer) {
+            Set-AuthenticodeSignature -FilePath $installer.FullName -Certificate $cert -TimestampServer "http://timestamp.digicert.com"
+          } else {
+            Write-Error "NSIS installer not found in build/bin/"
+            exit 1
+          }
 
       - name: Rename installer
         working-directory: ./build/bin
         shell: pwsh
         run: |
-          $installer = Get-ChildItem -Filter "*installer.exe" | Select-Object -First 1
-          Rename-Item -Path $installer.Name -NewName "TinyRDM_Setup_${{ steps.normalise_version.outputs.version }}_${{ steps.normalise_platform.outputs.tag }}.exe"
+          $installer = Get-ChildItem -Filter "*-installer.exe" | Select-Object -First 1
+          if ($installer) {
+            Rename-Item -Path $installer.Name -NewName "TinyRDM_Setup_${{ steps.normalise_version.outputs.version }}_${{ steps.normalise_platform.outputs.tag }}.exe"
+          } else {
+            Write-Error "NSIS installer not found"
+            exit 1
+          }
 
       - name: Upload release asset (Installer)
         uses: softprops/action-gh-release@v1
