@@ -54,14 +54,23 @@ jobs:
         with:
           go-version: stable
 
-      - name: Install jq
+      - name: Install chocolatey
         uses: crazy-max/ghaction-chocolatey@v2
         with:
-          args: install jq
+          args: install nsis jq
 
       - name: Add NSIS to PATH
         shell: pwsh
-        run: echo "C:\Program Files (x86)\NSIS" >> $env:GITHUB_PATH
+        run: |
+          $nsisPath = (Get-Command makensis -ErrorAction SilentlyContinue).Source
+          if ($nsisPath) {
+            Write-Host "makensis already in PATH: $nsisPath"
+          } else {
+            $dir = "C:\Program Files (x86)\NSIS"
+            if (-not (Test-Path "$dir\makensis.exe")) { $dir = "C:\Program Files\NSIS" }
+            Write-Host "Adding to PATH: $dir"
+            echo $dir >> $env:GITHUB_PATH
+          }
 
       - name: Install wails
         shell: bash
