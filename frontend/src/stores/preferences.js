@@ -351,7 +351,7 @@ const usePreferencesStore = defineStore('preferences', {
          */
         async savePreferences() {
             const pf = pick(this, ['behavior', 'general', 'editor', 'cli', 'decoder'])
-            const { success, msg } = await SetPreferences(pf)
+            const { success } = await SetPreferences(pf)
             return success === true
         },
 
