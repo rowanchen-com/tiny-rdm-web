@@ -61,7 +61,7 @@ jobs:
 
       - name: Add NSIS to PATH
         shell: pwsh
-        run: echo "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Append
+        run: echo "C:\Program Files (x86)\NSIS" >> $env:GITHUB_PATH
 
       - name: Install wails
         shell: bash
