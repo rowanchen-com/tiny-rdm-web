@@ -86,6 +86,10 @@ jobs:
           -webview2 embed \
           -ldflags "-X main.version=v${{ steps.normalise_version.outputs.version }} -X main.gaMeasurementID=${{ secrets.GA_MEASUREMENT_ID }} -X main.gaSecretKey=${{ secrets.WINDOWS_GA_SECRET }}"
 
+      - name: List portable build output
+        shell: pwsh
+        run: Get-ChildItem ./build/bin/ -Recurse
+
       - name: Compress portable binary
         working-directory: ./build/bin
         run: Compress-Archive "Tiny RDM.exe" "TinyRDM_Portable_${{ steps.normalise_version.outputs.version }}_${{ steps.normalise_platform.outputs.tag }}.zip"
@@ -103,6 +107,10 @@ jobs:
           CGO_ENABLED=1 wails build -clean -platform ${{ matrix.platform }} \
           -nsis -webview2 embed \
           -ldflags "-X main.version=v${{ steps.normalise_version.outputs.version }}"
+
+      - name: List build output
+        shell: pwsh
+        run: Get-ChildItem ./build/bin/ -Recurse
 
       - name: Create self-signed certificate and sign installer
         shell: pwsh
