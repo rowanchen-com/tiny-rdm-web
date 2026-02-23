@@ -287,7 +287,7 @@ const usePreferencesStore = defineStore('preferences', {
 
         /**
          * load preferences from local
-         * @returns {Promise<void>}
+         * @returns {Promise<boolean>}
          */
         async loadPreferences() {
             const { success, data } = await GetPreferences()
@@ -313,6 +313,7 @@ const usePreferencesStore = defineStore('preferences', {
                 }
                 i18nGlobal.locale.value = this.currentLanguage
             }
+            return success
         },
 
         /**
