@@ -54,10 +54,10 @@ jobs:
         with:
           go-version: stable
 
-      - name: Install chocolatey
+      - name: Install jq
         uses: crazy-max/ghaction-chocolatey@v2
         with:
-          args: install nsis jq
+          args: install jq
 
       - name: Add NSIS to PATH
         shell: pwsh
