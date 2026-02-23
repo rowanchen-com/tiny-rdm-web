@@ -84,7 +84,14 @@ const onLogin = async () => {
         const runtime = await import('wailsjs/runtime/runtime.js')
         if (runtime.ReconnectWebSocket) runtime.ReconnectWebSocket()
     } catch {}
+    // Capture login page theme choice before loadPreferences overwrites it
+    const loginTheme = localStorage.getItem('rdm_login_theme')
     await initApp()
+    // Sync login page theme choice to preferences (overrides server-saved value)
+    if (loginTheme && ['auto', 'light', 'dark'].includes(loginTheme)) {
+        prefStore.general.theme = loginTheme
+        prefStore.savePreferences()
+    }
 }
 
 const initApp = async () => {
@@ -175,6 +182,11 @@ const onOrientationChange = () => {
 
 onMounted(async () => {
     if (isWebMode) {
+        // Apply saved login theme before auth check to prevent flash
+        const savedTheme = localStorage.getItem('rdm_login_theme')
+        if (savedTheme && ['auto', 'light', 'dark'].includes(savedTheme)) {
+            prefStore.general.theme = savedTheme
+        }
         window.addEventListener('rdm:unauthorized', onUnauthorized)
         window.addEventListener('orientationchange', onOrientationChange)
         window.addEventListener('resize', onOrientationChange)

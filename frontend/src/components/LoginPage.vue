@@ -1,10 +1,30 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useThemeVars } from 'naive-ui'
 import iconUrl from '@/assets/images/icon.png'
+import usePreferencesStore from '@/stores/preferences.js'
 
 const themeVars = useThemeVars()
+const prefStore = usePreferencesStore()
 const emit = defineEmits(['login'])
+
+// Theme toggle: auto / light / dark — stored in localStorage, synced to prefStore
+const THEME_KEY = 'rdm_login_theme'
+const themeMode = ref(localStorage.getItem(THEME_KEY) || 'auto')
+
+// Apply on mount
+onMounted(() => {
+    prefStore.general.theme = themeMode.value
+})
+
+const themeIcons = { auto: '◑', light: '☀', dark: '☾' }
+const themeCycle = { auto: 'light', light: 'dark', dark: 'auto' }
+
+const toggleTheme = () => {
+    themeMode.value = themeCycle[themeMode.value] || 'auto'
+    prefStore.general.theme = themeMode.value
+    localStorage.setItem(THEME_KEY, themeMode.value)
+}
 
 // i18n for login page - detect browser language
 const langTexts = {
@@ -94,6 +114,10 @@ const handleLogin = async () => {
                 <n-text depth="2" style="font-size: 13px">Redis Web Manager</n-text>
             </div>
 
+            <div class="theme-toggle" @click="toggleTheme" role="button" :title="themeMode">
+                <span class="theme-icon">{{ themeIcons[themeMode] }}</span>
+            </div>
+
             <n-form class="login-form" @submit.prevent="handleLogin">
                 <n-form-item :label="t.username">
                     <n-input
@@ -167,6 +191,7 @@ const handleLogin = async () => {
     border: 1px solid v-bind('themeVars.borderColor');
     background-color: v-bind('themeVars.cardColor');
     box-sizing: border-box;
+    position: relative;
 }
 
 .login-header {
@@ -182,6 +207,32 @@ const handleLogin = async () => {
     font-weight: 800;
     margin-top: 4px;
     color: v-bind('themeVars.textColor1');
+}
+
+.theme-toggle {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    cursor: pointer;
+    color: v-bind('themeVars.textColor3');
+    transition: background-color 0.2s, color 0.2s;
+    user-select: none;
+
+    &:hover {
+        background-color: v-bind('themeVars.buttonColor2Hover');
+        color: v-bind('themeVars.textColor1');
+    }
+}
+
+.theme-icon {
+    font-size: 18px;
+    line-height: 1;
 }
 
 .login-form {
