@@ -8,25 +8,98 @@ const themeVars = useThemeVars()
 const prefStore = usePreferencesStore()
 const emit = defineEmits(['login'])
 
-// Theme toggle: auto / light / dark — stored in localStorage, synced to prefStore
+// --- Theme ---
 const THEME_KEY = 'rdm_login_theme'
 const themeMode = ref(localStorage.getItem(THEME_KEY) || 'auto')
 
-// Apply on mount
 onMounted(() => {
     prefStore.general.theme = themeMode.value
 })
 
-const themeIcons = { auto: '◑', light: '☀', dark: '☾' }
-const themeCycle = { auto: 'light', light: 'dark', dark: 'auto' }
-
-const toggleTheme = () => {
-    themeMode.value = themeCycle[themeMode.value] || 'auto'
-    prefStore.general.theme = themeMode.value
-    localStorage.setItem(THEME_KEY, themeMode.value)
+const themeLabels = {
+    zh: { auto: '自动', light: '浅色', dark: '暗黑' },
+    tw: { auto: '自動', light: '淺色', dark: '暗黑' },
+    ja: { auto: '自動', light: 'ライト', dark: 'ダーク' },
+    ko: { auto: '자동', light: '라이트', dark: '다크' },
+    es: { auto: 'Auto', light: 'Claro', dark: 'Oscuro' },
+    fr: { auto: 'Auto', light: 'Clair', dark: 'Sombre' },
+    ru: { auto: 'Авто', light: 'Светлая', dark: 'Тёмная' },
+    pt: { auto: 'Auto', light: 'Claro', dark: 'Escuro' },
+    tr: { auto: 'Otomatik', light: 'Açık', dark: 'Koyu' },
+    en: { auto: 'Auto', light: 'Light', dark: 'Dark' },
 }
 
-// i18n for login page - detect browser language
+const themeOptions = computed(() => {
+    const labels = themeLabels[currentLang.value] || themeLabels.en
+    return [
+        { label: '☀ ' + labels.light, key: 'light' },
+        { label: '☾ ' + labels.dark, key: 'dark' },
+        { label: '◑ ' + labels.auto, key: 'auto' },
+    ]
+})
+
+const currentThemeLabel = computed(() => {
+    const labels = themeLabels[currentLang.value] || themeLabels.en
+    const icons = { auto: '◑', light: '☀', dark: '☾' }
+    return icons[themeMode.value] + ' ' + labels[themeMode.value]
+})
+
+const onThemeSelect = (key) => {
+    if (!['auto', 'light', 'dark'].includes(key)) return
+    themeMode.value = key
+    prefStore.general.theme = key
+    localStorage.setItem(THEME_KEY, key)
+}
+
+// --- Language ---
+const LANG_KEY = 'rdm_login_lang'
+const langNames = {
+    auto: { zh: '自动', tw: '自動', ja: '自動', ko: '자동', es: 'Auto', fr: 'Auto', ru: 'Авто', pt: 'Auto', tr: 'Otomatik', en: 'Auto' },
+    zh: '简体中文', tw: '繁體中文', en: 'English', ja: '日本語', ko: '한국어',
+    es: 'Español', fr: 'Français', ru: 'Русский', pt: 'Português', tr: 'Türkçe',
+}
+
+const detectSystemLang = () => {
+    const sysLang = (navigator.language || '').toLowerCase()
+    if (sysLang.startsWith('zh-tw') || sysLang.startsWith('zh-hant')) return 'tw'
+    const prefix = sysLang.split('-')[0]
+    return langNames[prefix] ? prefix : 'en'
+}
+
+const langSetting = ref(localStorage.getItem(LANG_KEY) || 'auto')
+const currentLang = computed(() => langSetting.value === 'auto' ? detectSystemLang() : langSetting.value)
+
+const langOptions = computed(() => {
+    const autoLabel = typeof langNames.auto === 'object'
+        ? (langNames.auto[currentLang.value] || langNames.auto.en)
+        : langNames.auto
+    return [
+        { label: autoLabel, key: 'auto' },
+        { type: 'divider' },
+        ...Object.entries(langNames)
+            .filter(([k]) => k !== 'auto')
+            .map(([k, v]) => ({ label: v, key: k })),
+    ]
+})
+
+const currentLangLabel = computed(() => {
+    if (langSetting.value === 'auto') {
+        const autoLabel = typeof langNames.auto === 'object'
+            ? (langNames.auto[currentLang.value] || langNames.auto.en)
+            : langNames.auto
+        return '🌐 ' + autoLabel
+    }
+    return '🌐 ' + (langNames[langSetting.value] || langSetting.value)
+})
+
+const onLangSelect = (key) => {
+    const valid = ['auto', ...Object.keys(langNames).filter(k => k !== 'auto')]
+    if (!valid.includes(key)) return
+    langSetting.value = key
+    localStorage.setItem(LANG_KEY, key)
+}
+
+// --- i18n texts ---
 const langTexts = {
     zh: { title: '登录', username: '用户名', password: '密码', usernamePh: '请输入用户名', passwordPh: '请输入密码', submit: '登 录', tooMany: '尝试次数过多，请稍后再试', failed: '用户名或密码错误', network: '网络错误' },
     tw: { title: '登入', username: '使用者名稱', password: '密碼', usernamePh: '請輸入使用者名稱', passwordPh: '請輸入密碼', submit: '登 入', tooMany: '嘗試次數過多，請稍後再試', failed: '使用者名稱或密碼錯誤', network: '網路錯誤' },
@@ -40,22 +113,15 @@ const langTexts = {
     en: { title: 'Sign In', username: 'Username', password: 'Password', usernamePh: 'Enter username', passwordPh: 'Enter password', submit: 'Sign In', tooMany: 'Too many attempts, please try later', failed: 'Invalid credentials', network: 'Network error' },
 }
 
-const detectLang = () => {
-    const sysLang = (navigator.language || '').toLowerCase()
-    if (sysLang.startsWith('zh-tw') || sysLang.startsWith('zh-hant')) return 'tw'
-    const prefix = sysLang.split('-')[0]
-    return langTexts[prefix] ? prefix : 'en'
-}
+const t = computed(() => langTexts[currentLang.value] || langTexts.en)
 
-const t = computed(() => langTexts[detectLang()])
-
+// --- Form ---
 const username = ref('')
 const password = ref('')
 const loading = ref(false)
 const errorMsg = ref('')
 const appVersion = ref('')
 
-// Fetch version on mount
 ;(async () => {
     try {
         const resp = await fetch('/api/version')
@@ -114,10 +180,6 @@ const handleLogin = async () => {
                 <n-text depth="2" style="font-size: 13px">Redis Web Manager</n-text>
             </div>
 
-            <div class="theme-toggle" @click="toggleTheme" role="button" :title="themeMode">
-                <span class="theme-icon">{{ themeIcons[themeMode] }}</span>
-            </div>
-
             <n-form class="login-form" @submit.prevent="handleLogin">
                 <n-form-item :label="t.username">
                     <n-input
@@ -153,21 +215,25 @@ const handleLogin = async () => {
                 </n-button>
             </n-form>
         </div>
-
     </div>
 
     <div class="login-footer">
-        <n-text depth="2" style="font-size: 14px">
-            <span v-if="appVersion">{{ appVersion }}</span>
-            <span v-if="appVersion"> · </span>
-            <a
-                href="https://github.com/tiny-craft/tiny-rdm"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="footer-link">
-                GitHub
-            </a>
-        </n-text>
+        <div class="footer-row">
+            <n-dropdown :options="langOptions" trigger="hover" size="small" @select="onLangSelect">
+                <span class="footer-btn">{{ currentLangLabel }}</span>
+            </n-dropdown>
+            <span class="footer-sep">|</span>
+            <n-dropdown :options="themeOptions" trigger="hover" size="small" @select="onThemeSelect">
+                <span class="footer-btn">{{ currentThemeLabel }}</span>
+            </n-dropdown>
+        </div>
+        <div class="footer-row" style="margin-top: 6px">
+            <n-text depth="3" style="font-size: 13px">
+                <span v-if="appVersion">{{ appVersion }}</span>
+                <span v-if="appVersion"> · </span>
+                <a href="https://github.com/tiny-craft/tiny-rdm" target="_blank" rel="noopener noreferrer" class="footer-link">GitHub</a>
+            </n-text>
+        </div>
     </div>
 </template>
 
@@ -191,7 +257,6 @@ const handleLogin = async () => {
     border: 1px solid v-bind('themeVars.borderColor');
     background-color: v-bind('themeVars.cardColor');
     box-sizing: border-box;
-    position: relative;
 }
 
 .login-header {
@@ -207,32 +272,6 @@ const handleLogin = async () => {
     font-weight: 800;
     margin-top: 4px;
     color: v-bind('themeVars.textColor1');
-}
-
-.theme-toggle {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 6px;
-    cursor: pointer;
-    color: v-bind('themeVars.textColor3');
-    transition: background-color 0.2s, color 0.2s;
-    user-select: none;
-
-    &:hover {
-        background-color: v-bind('themeVars.buttonColor2Hover');
-        color: v-bind('themeVars.textColor1');
-    }
-}
-
-.theme-icon {
-    font-size: 18px;
-    line-height: 1;
 }
 
 .login-form {
@@ -252,7 +291,37 @@ const handleLogin = async () => {
     left: 0;
     right: 0;
     text-align: center;
+}
+
+.footer-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+}
+
+.footer-btn {
+    font-size: 13px;
     color: v-bind('themeVars.textColor3');
+    cursor: pointer;
+    padding: 2px 8px;
+    border-radius: 4px;
+    transition: color 0.2s, background-color 0.2s;
+    user-select: none;
+    white-space: nowrap;
+
+    &:hover {
+        color: v-bind('themeVars.textColor1');
+        background-color: v-bind('themeVars.buttonColor2Hover');
+    }
+}
+
+.footer-sep {
+    color: v-bind('themeVars.textColor3');
+    opacity: 0.3;
+    font-size: 13px;
+    margin: 0 2px;
+    user-select: none;
 }
 
 .footer-link {

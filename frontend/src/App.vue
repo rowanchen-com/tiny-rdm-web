@@ -84,14 +84,25 @@ const onLogin = async () => {
         const runtime = await import('wailsjs/runtime/runtime.js')
         if (runtime.ReconnectWebSocket) runtime.ReconnectWebSocket()
     } catch {}
-    // Capture login page theme choice before loadPreferences overwrites it
+    // Capture login page choices before loadPreferences overwrites them
     const loginTheme = localStorage.getItem('rdm_login_theme')
+    const loginLang = localStorage.getItem('rdm_login_lang')
     await initApp()
-    // Sync login page theme choice to preferences (overrides server-saved value)
+    // Sync login page choices to preferences
+    let needSave = false
     if (loginTheme && ['auto', 'light', 'dark'].includes(loginTheme)) {
         prefStore.general.theme = loginTheme
-        prefStore.savePreferences()
+        needSave = true
     }
+    if (loginLang) {
+        const validLangs = ['auto', 'zh', 'tw', 'en', 'ja', 'ko', 'es', 'fr', 'ru', 'pt', 'tr']
+        if (validLangs.includes(loginLang)) {
+            prefStore.general.language = loginLang
+            i18n.locale.value = prefStore.currentLanguage
+            needSave = true
+        }
+    }
+    if (needSave) prefStore.savePreferences()
 }
 
 const initApp = async () => {
