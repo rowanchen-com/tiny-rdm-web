@@ -32,16 +32,15 @@ const themeLabels = {
 const themeOptions = computed(() => {
     const labels = themeLabels[currentLang.value] || themeLabels.en
     return [
-        { label: '☀ ' + labels.light, key: 'light' },
-        { label: '☾ ' + labels.dark, key: 'dark' },
-        { label: '◑ ' + labels.auto, key: 'auto' },
+        { label: labels.light, key: 'light', icon: renderIcon('sun') },
+        { label: labels.dark, key: 'dark', icon: renderIcon('moon') },
+        { label: labels.auto, key: 'auto', icon: renderIcon('auto') },
     ]
 })
 
 const currentThemeLabel = computed(() => {
     const labels = themeLabels[currentLang.value] || themeLabels.en
-    const icons = { auto: '◑', light: '☀', dark: '☾' }
-    return icons[themeMode.value] + ' ' + labels[themeMode.value]
+    return labels[themeMode.value]
 })
 
 const onThemeSelect = (key) => {
@@ -54,9 +53,12 @@ const onThemeSelect = (key) => {
 // --- Language ---
 const LANG_KEY = 'rdm_login_lang'
 const langNames = {
-    auto: { zh: '自动', tw: '自動', ja: '自動', ko: '자동', es: 'Auto', fr: 'Auto', ru: 'Авто', pt: 'Auto', tr: 'Otomatik', en: 'Auto' },
     zh: '简体中文', tw: '繁體中文', en: 'English', ja: '日本語', ko: '한국어',
     es: 'Español', fr: 'Français', ru: 'Русский', pt: 'Português', tr: 'Türkçe',
+}
+const autoLabel = {
+    zh: '自动', tw: '自動', ja: '自動', ko: '자동', es: 'Auto',
+    fr: 'Auto', ru: 'Авто', pt: 'Auto', tr: 'Otomatik', en: 'Auto',
 }
 
 const detectSystemLang = () => {
@@ -69,35 +71,58 @@ const detectSystemLang = () => {
 const langSetting = ref(localStorage.getItem(LANG_KEY) || 'auto')
 const currentLang = computed(() => langSetting.value === 'auto' ? detectSystemLang() : langSetting.value)
 
-const langOptions = computed(() => {
-    const autoLabel = typeof langNames.auto === 'object'
-        ? (langNames.auto[currentLang.value] || langNames.auto.en)
-        : langNames.auto
-    return [
-        { label: autoLabel, key: 'auto' },
-        { type: 'divider' },
-        ...Object.entries(langNames)
-            .filter(([k]) => k !== 'auto')
-            .map(([k, v]) => ({ label: v, key: k })),
-    ]
-})
+const langOptions = computed(() => [
+    { label: autoLabel[currentLang.value] || 'Auto', key: 'auto' },
+    { type: 'divider' },
+    ...Object.entries(langNames).map(([k, v]) => ({ label: v, key: k })),
+])
 
 const currentLangLabel = computed(() => {
-    if (langSetting.value === 'auto') {
-        const autoLabel = typeof langNames.auto === 'object'
-            ? (langNames.auto[currentLang.value] || langNames.auto.en)
-            : langNames.auto
-        return '🌐 ' + autoLabel
-    }
-    return '🌐 ' + (langNames[langSetting.value] || langSetting.value)
+    if (langSetting.value === 'auto') return autoLabel[currentLang.value] || 'Auto'
+    return langNames[langSetting.value] || langSetting.value
 })
 
 const onLangSelect = (key) => {
-    const valid = ['auto', ...Object.keys(langNames).filter(k => k !== 'auto')]
+    const valid = ['auto', ...Object.keys(langNames)]
     if (!valid.includes(key)) return
     langSetting.value = key
     localStorage.setItem(LANG_KEY, key)
 }
+
+// --- Render icon helper for dropdown items ---
+import { h } from 'vue'
+import { NIcon } from 'naive-ui'
+
+const SunSvg = {
+    render: () => h('svg', { xmlns: 'http://www.w3.org/2000/svg', viewBox: '0 0 24 24', width: '1em', height: '1em', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, [
+        h('circle', { cx: '12', cy: '12', r: '5' }),
+        h('path', { d: 'M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42' }),
+    ]),
+}
+const MoonSvg = {
+    render: () => h('svg', { xmlns: 'http://www.w3.org/2000/svg', viewBox: '0 0 24 24', width: '1em', height: '1em', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, [
+        h('path', { d: 'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z' }),
+    ]),
+}
+const AutoSvg = {
+    render: () => h('svg', { xmlns: 'http://www.w3.org/2000/svg', viewBox: '0 0 24 24', width: '1em', height: '1em', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, [
+        h('circle', { cx: '12', cy: '12', r: '10' }),
+        h('path', { d: 'M12 2a10 10 0 0 1 0 20V2' }),
+    ]),
+}
+const LangSvg = {
+    render: () => h('svg', { xmlns: 'http://www.w3.org/2000/svg', viewBox: '0 0 24 24', width: '1em', height: '1em', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, [
+        h('path', { d: 'M5 8l6 6' }),
+        h('path', { d: 'M4 14l6-6 2-3' }),
+        h('path', { d: 'M2 5h12' }),
+        h('path', { d: 'M7 2h1' }),
+        h('path', { d: 'M22 22l-5-10-5 10' }),
+        h('path', { d: 'M14 18h6' }),
+    ]),
+}
+
+const iconMap = { sun: SunSvg, moon: MoonSvg, auto: AutoSvg, lang: LangSvg }
+const renderIcon = (name) => () => h(NIcon, null, { default: () => h(iconMap[name]) })
 
 // --- i18n texts ---
 const langTexts = {
@@ -144,24 +169,11 @@ const handleLogin = async () => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
-            body: JSON.stringify({
-                username: username.value,
-                password: password.value,
-            }),
+            body: JSON.stringify({ username: username.value, password: password.value }),
         })
-
         const data = await resp.json()
-
-        if (resp.status === 429) {
-            errorMsg.value = t.value.tooMany
-            return
-        }
-
-        if (!data.success) {
-            errorMsg.value = t.value.failed
-            return
-        }
-
+        if (resp.status === 429) { errorMsg.value = t.value.tooMany; return }
+        if (!data.success) { errorMsg.value = t.value.failed; return }
         emit('login')
     } catch (e) {
         errorMsg.value = t.value.network
@@ -175,9 +187,9 @@ const handleLogin = async () => {
     <div class="login-wrapper">
         <div class="login-card">
             <div class="login-header">
-                <n-avatar :size="48" :src="iconUrl" color="#0000" />
+                <n-avatar :size="64" :src="iconUrl" color="#0000" />
                 <div class="login-title">Tiny RDM</div>
-                <n-text depth="2" style="font-size: 13px">Redis Web Manager</n-text>
+                <n-text depth="3" style="font-size: 13px">Redis Web Manager</n-text>
             </div>
 
             <n-form class="login-form" @submit.prevent="handleLogin">
@@ -186,7 +198,7 @@ const handleLogin = async () => {
                         v-model:value="username"
                         autofocus
                         :placeholder="t.usernamePh"
-                        size="medium"
+                        size="large"
                         @keydown.enter="handleLogin" />
                 </n-form-item>
                 <n-form-item :label="t.password">
@@ -194,7 +206,7 @@ const handleLogin = async () => {
                         v-model:value="password"
                         :placeholder="t.passwordPh"
                         show-password-on="click"
-                        size="medium"
+                        size="large"
                         type="password"
                         @keydown.enter="handleLogin" />
                 </n-form-item>
@@ -209,30 +221,34 @@ const handleLogin = async () => {
                     attr-type="submit"
                     block
                     type="primary"
-                    size="medium"
+                    size="large"
+                    style="margin-top: 8px"
                     @click="handleLogin">
                     {{ t.submit }}
                 </n-button>
             </n-form>
-        </div>
-    </div>
 
-    <div class="login-footer">
-        <div class="footer-row">
-            <n-dropdown :options="langOptions" trigger="hover" size="small" @select="onLangSelect">
-                <span class="footer-btn">{{ currentLangLabel }}</span>
-            </n-dropdown>
-            <span class="footer-sep">|</span>
-            <n-dropdown :options="themeOptions" trigger="hover" size="small" @select="onThemeSelect">
-                <span class="footer-btn">{{ currentThemeLabel }}</span>
-            </n-dropdown>
-        </div>
-        <div class="footer-row" style="margin-top: 6px">
-            <n-text depth="3" style="font-size: 13px">
-                <span v-if="appVersion">{{ appVersion }}</span>
-                <span v-if="appVersion"> · </span>
-                <a href="https://github.com/tiny-craft/tiny-rdm" target="_blank" rel="noopener noreferrer" class="footer-link">GitHub</a>
-            </n-text>
+            <div class="login-toolbar">
+                <n-dropdown :options="langOptions" trigger="hover" size="small" @select="onLangSelect">
+                    <span class="toolbar-btn">
+                        <n-icon :size="14" :component="LangSvg" />
+                        <span>{{ currentLangLabel }}</span>
+                    </span>
+                </n-dropdown>
+                <n-divider vertical style="margin: 0 4px" />
+                <n-dropdown :options="themeOptions" trigger="hover" size="small" @select="onThemeSelect">
+                    <span class="toolbar-btn">
+                        <n-icon :size="14" :component="themeMode === 'dark' ? MoonSvg : themeMode === 'light' ? SunSvg : AutoSvg" />
+                        <span>{{ currentThemeLabel }}</span>
+                    </span>
+                </n-dropdown>
+                <template v-if="appVersion">
+                    <n-divider vertical style="margin: 0 4px" />
+                    <a href="https://github.com/tiny-craft/tiny-rdm" target="_blank" rel="noopener noreferrer" class="toolbar-btn toolbar-link">
+                        {{ appVersion }}
+                    </a>
+                </template>
+            </div>
         </div>
     </div>
 </template>
@@ -250,12 +266,13 @@ const handleLogin = async () => {
 }
 
 .login-card {
-    width: 360px;
+    width: 420px;
     max-width: 100%;
-    padding: 40px 36px 36px;
-    border-radius: 8px;
+    padding: 48px 40px 36px;
+    border-radius: 10px;
     border: 1px solid v-bind('themeVars.borderColor');
     background-color: v-bind('themeVars.cardColor');
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
     box-sizing: border-box;
 }
 
@@ -264,19 +281,19 @@ const handleLogin = async () => {
     flex-direction: column;
     align-items: center;
     gap: 6px;
-    margin-bottom: 32px;
+    margin-bottom: 40px;
 }
 
 .login-title {
-    font-size: 22px;
+    font-size: 24px;
     font-weight: 800;
-    margin-top: 4px;
+    margin-top: 8px;
     color: v-bind('themeVars.textColor1');
 }
 
 .login-form {
     :deep(.n-form-item) {
-        margin-bottom: 16px;
+        margin-bottom: 18px;
     }
 
     :deep(.n-form-item-label) {
@@ -285,75 +302,61 @@ const handleLogin = async () => {
     }
 }
 
-.login-footer {
-    position: fixed;
-    bottom: 16px;
-    left: 0;
-    right: 0;
-    text-align: center;
-}
-
-.footer-row {
+.login-toolbar {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0;
+    margin-top: 28px;
+    flex-wrap: wrap;
+    gap: 2px;
 }
 
-.footer-btn {
+.toolbar-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     font-size: 13px;
     color: v-bind('themeVars.textColor3');
     cursor: pointer;
-    padding: 2px 8px;
+    padding: 2px 6px;
     border-radius: 4px;
     transition: color 0.2s, background-color 0.2s;
     user-select: none;
     white-space: nowrap;
 
     &:hover {
-        color: v-bind('themeVars.textColor1');
+        color: v-bind('themeVars.textColor2');
         background-color: v-bind('themeVars.buttonColor2Hover');
     }
 }
 
-.footer-sep {
-    color: v-bind('themeVars.textColor3');
-    opacity: 0.3;
-    font-size: 13px;
-    margin: 0 2px;
-    user-select: none;
-}
-
-.footer-link {
-    color: inherit;
+.toolbar-link {
     text-decoration: none;
-    opacity: 0.7;
-    transition: opacity 0.2s;
+    color: v-bind('themeVars.textColor3');
 
     &:hover {
-        opacity: 1;
-        text-decoration: underline;
+        color: v-bind('themeVars.textColor2');
     }
 }
 
 @media (max-width: 480px) {
     .login-wrapper {
         align-items: flex-start;
-        padding-top: 15vh;
+        padding-top: 12vh;
     }
 
     .login-card {
-        padding: 28px 20px 24px;
+        padding: 32px 24px 28px;
         border: none;
         border-radius: 12px;
     }
 
     .login-header {
-        margin-bottom: 24px;
+        margin-bottom: 28px;
     }
 
-    .login-footer {
-        bottom: 12px;
+    .login-toolbar {
+        margin-top: 20px;
     }
 }
 </style>
