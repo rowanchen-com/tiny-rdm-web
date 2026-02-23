@@ -205,16 +205,17 @@ onMounted(async () => {
         window.addEventListener('orientationchange', onOrientationChange)
         window.addEventListener('resize', onOrientationChange)
         await checkAuth()
-        if (authenticated.value || !authEnabled.value) {
+        if (authEnabled.value && !authenticated.value) {
+            // Not authenticated — show login page, do NOT call any API
+            setViewport('mobile')
+        } else {
             setViewport('desktop')
-            // Connect WebSocket before initApp (no login page shown)
+            // Connect WebSocket before initApp
             try {
                 const runtime = await import('wailsjs/runtime/runtime.js')
                 if (runtime.ReconnectWebSocket) await runtime.ReconnectWebSocket()
             } catch {}
             await initApp()
-        } else {
-            setViewport('mobile')
         }
     } else {
         // Desktop mode: original Wails flow, no auth needed
