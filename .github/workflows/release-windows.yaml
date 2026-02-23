@@ -110,12 +110,15 @@ jobs:
           $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=Tiny RDM" -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddYears(10)
           $password = ConvertTo-SecureString -String "TinyRDM2024" -Force -AsPlainText
           Export-PfxCertificate -Cert $cert -FilePath cert.pfx -Password $password
-          $exePath = (Get-ChildItem ./build/bin/*.exe).FullName
+          $exePath = (Get-ChildItem ./build/bin/*installer.exe).FullName
           Set-AuthenticodeSignature -FilePath $exePath -Certificate $cert -TimestampServer "http://timestamp.digicert.com"
 
       - name: Rename installer
         working-directory: ./build/bin
-        run: Rename-Item -Path "Tiny RDM.exe" -NewName "TinyRDM_Setup_${{ steps.normalise_version.outputs.version }}_${{ steps.normalise_platform.outputs.tag }}.exe"
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem -Filter "*installer.exe" | Select-Object -First 1
+          Rename-Item -Path $installer.Name -NewName "TinyRDM_Setup_${{ steps.normalise_version.outputs.version }}_${{ steps.normalise_platform.outputs.tag }}.exe"
 
       - name: Upload release asset (Installer)
         uses: softprops/action-gh-release@v1

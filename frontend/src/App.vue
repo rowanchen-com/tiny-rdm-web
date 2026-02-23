@@ -204,6 +204,11 @@ onMounted(async () => {
         await checkAuth()
         if (authenticated.value || !authEnabled.value) {
             setViewport('desktop')
+            // Connect WebSocket before initApp (no login page shown)
+            try {
+                const runtime = await import('wailsjs/runtime/runtime.js')
+                if (runtime.ReconnectWebSocket) await runtime.ReconnectWebSocket()
+            } catch {}
             await initApp()
         } else {
             setViewport('mobile')

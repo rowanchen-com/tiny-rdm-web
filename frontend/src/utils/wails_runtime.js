@@ -5,8 +5,8 @@
 
 import { connectWebSocket, reconnectWebSocket, waitForWebSocket, onWsEvent, offWsEvent, sendWsMessage } from '@/utils/websocket.js'
 
-// Initialize WebSocket connection
-connectWebSocket()
+// Don't auto-connect — wait for explicit call after login
+// connectWebSocket()
 
 // ==================== Events ====================
 
