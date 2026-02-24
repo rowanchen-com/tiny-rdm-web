@@ -18,6 +18,8 @@ import usePreferencesStore from 'stores/preferences.js'
 import { TextAlignType } from '@/consts/text_align_type.js'
 import { isMacOS } from '@/utils/platform.js'
 import { isWeb } from '@/utils/platform.js'
+import useTabStore from 'stores/tab.js'
+import { BrowserTabType } from '@/consts/browser_tab_type.js'
 
 const themeVars = useThemeVars()
 const browserStore = useBrowserStore()
@@ -218,9 +220,13 @@ onUnmounted(() => {
     }
 })
 
-// Web mode: intercept F5/Ctrl+R/Cmd+R at window level to prevent browser refresh
-// The component @keydown handler may not fire if focus is inside CodeMirror editor
+// Web mode: only intercept browser refresh when key detail tab is active
+const tabStore2 = useTabStore()
 const onPreventBrowserRefresh = (e) => {
+    if (tabStore2.nav !== 'browser') return
+    const { subTab } = tabStore2.currentTab || {}
+    if (subTab !== BrowserTabType.KeyDetail.toString()) return
+
     const isCtrlOn = isMacOS() ? e.metaKey : e.ctrlKey
     if (e.key === 'F5' || (isCtrlOn && e.key === 'r')) {
         e.preventDefault()

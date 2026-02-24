@@ -194,7 +194,6 @@ const onOrientationChange = () => {
     resizeTimer = setTimeout(() => setViewport('desktop'), 200)
 }
 
-
 onMounted(async () => {
     if (isWebMode) {
         // Apply saved login theme before auth check to prevent flash
