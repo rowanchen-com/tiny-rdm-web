@@ -8,7 +8,7 @@ import ContentValueZset from '@/components/content_value/ContentValueZSet.vue'
 import ContentValueStream from '@/components/content_value/ContentValueStream.vue'
 import { useThemeVars } from 'naive-ui'
 import useBrowserStore from 'stores/browser.js'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { isEmpty } from 'lodash'
 import useDialogStore from 'stores/dialog.js'
 import { useI18n } from 'vue-i18n'
@@ -17,6 +17,7 @@ import ContentValueJson from '@/components/content_value/ContentValueJson.vue'
 import usePreferencesStore from 'stores/preferences.js'
 import { TextAlignType } from '@/consts/text_align_type.js'
 import { isMacOS } from '@/utils/platform.js'
+import { isWeb } from '@/utils/platform.js'
 
 const themeVars = useThemeVars()
 const browserStore = useBrowserStore()
@@ -206,7 +207,25 @@ const initContent = async () => {
 onMounted(() => {
     // onReload()
     initContent()
+    if (isWeb()) {
+        window.addEventListener('keydown', onPreventBrowserRefresh)
+    }
 })
+
+onUnmounted(() => {
+    if (isWeb()) {
+        window.removeEventListener('keydown', onPreventBrowserRefresh)
+    }
+})
+
+// Web mode: intercept F5/Ctrl+R/Cmd+R at window level to prevent browser refresh
+// The component @keydown handler may not fire if focus is inside CodeMirror editor
+const onPreventBrowserRefresh = (e) => {
+    const isCtrlOn = isMacOS() ? e.metaKey : e.ctrlKey
+    if (e.key === 'F5' || (isCtrlOn && e.key === 'r')) {
+        e.preventDefault()
+    }
+}
 
 watch(() => data.value?.keyPath, initContent)
 </script>
