@@ -137,10 +137,12 @@ const onKeyShortcut = (e) => {
             onDelete()
             return
         case 'F5':
+            e.preventDefault()
             onReload()
             return
         case 'r':
             if (isCtrlOn) {
+                e.preventDefault()
                 onReload()
             }
             return

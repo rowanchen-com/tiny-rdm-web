@@ -1,17 +1,15 @@
 services:
   tinyrdm:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: tinyrdm
+    image: ghcr.io/rowanchen-com/tiny-rdm-web:latest
     container_name: tinyrdm
+    restart: unless-stopped
     ports:
       - "8088:8088"
     environment:
       - PORT=8088
       - GIN_MODE=release
       - ADMIN_USERNAME=admin
-      - ADMIN_PASSWORD=changeme
-    restart: unless-stopped
+      - ADMIN_PASSWORD=tinyrdm
+      # - SESSION_TTL=24h
     volumes:
       - ./data:/app/TinyRDM

@@ -194,12 +194,6 @@ const onOrientationChange = () => {
     resizeTimer = setTimeout(() => setViewport('desktop'), 200)
 }
 
-// Intercept browser refresh (F5 / Ctrl+R / Cmd+R) to prevent losing connection state
-const onPreventRefresh = (e) => {
-    if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && e.key === 'r')) {
-        e.preventDefault()
-    }
-}
 
 onMounted(async () => {
     if (isWebMode) {
@@ -211,7 +205,6 @@ onMounted(async () => {
         window.addEventListener('rdm:unauthorized', onUnauthorized)
         window.addEventListener('orientationchange', onOrientationChange)
         window.addEventListener('resize', onOrientationChange)
-        window.addEventListener('keydown', onPreventRefresh)
         await checkAuth()
         if (authEnabled.value && !authenticated.value) {
             // Not authenticated — show login page, do NOT call any API
@@ -236,7 +229,6 @@ onUnmounted(() => {
         window.removeEventListener('rdm:unauthorized', onUnauthorized)
         window.removeEventListener('orientationchange', onOrientationChange)
         window.removeEventListener('resize', onOrientationChange)
-        window.removeEventListener('keydown', onPreventRefresh)
     }
 })
 
