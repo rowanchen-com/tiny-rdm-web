@@ -114,9 +114,14 @@ server {
 ### 登录页面
 
 - 自动检测浏览器语言（zh/tw/en/ja/ko/es/fr/ru/pt/tr）
-- NaiveUI 组件，契合 Tiny RDM UI 风格
+- NaiveUI 组件，契合 Tiny RDM UI 风格，卡片宽度 420px
+- 主题切换（自动/浅色/暗黑）+ 语言选择器，位于登录按钮下方工具栏，`n-dropdown` hover 触发
+- 主题和语言选择存储在 `localStorage`（`rdm_login_theme` / `rdm_login_lang`），登录成功后同步到后端偏好设置
+- 启动时自动应用已保存的主题，防止页面闪烁
+- SVG stroke 图标（太阳/月亮/半圆/语言），颜色跟随 NaiveUI 主题
 - 页脚显示动态版本号 + GitHub 链接
 - 副标题 "Redis Web Manager"（区别于桌面版）
+- 暗色模式下标题颜色正确跟随主题（`v-bind('themeVars.textColor1')`）
 - 移动端自适应（`@media max-width: 480px`）
 
 ### API 路由
@@ -334,6 +339,8 @@ services.EventsEmit(s.ctx, "event_name", data)
 - Web 模式：认证门控 → viewport 管理 → WebSocket 重连 → 初始化应用
 - 桌面模式：直接调用 `initApp()`，与原版行为一致
 - `onLogin()` 通过动态 `import()` 调用 `ReconnectWebSocket()`，避免静态导入
+- `onLogin()` 登录后同步 `localStorage` 中的主题和语言选择到后端偏好设置
+- `onMounted()` 启动时应用已保存的登录主题，防止页面闪烁
 - 模板三段条件渲染：`authChecking` → 空白 / `!authenticated` → LoginPage / `else` → 原始内容
 
 **`AppContent.vue`** — `isWeb()` 判断隐藏窗口控制按钮 + Web 模式使用 Windows 样式 + `100dvh`。
@@ -357,7 +364,7 @@ services.EventsEmit(s.ctx, "event_name", data)
 | 文件 | 说明 |
 |---|---|
 | `src/utils/api.js` | HTTP API 适配器，~80 个导出函数，签名与 Wails 绑定完全一致。内含 `post()`/`get()`/`del()` 基础函数，401 时自动触发 `rdm:unauthorized`。连接导入导出使用文件上传/下载替代原生对话框。 |
-| `src/utils/wails_runtime.js` | Wails Runtime Web 替代：事件→WebSocket、剪贴板→`navigator.clipboard`（含 `execCommand` 降级）、窗口管理→no-op、`Environment()` 返回 `platform: 'web'`。导出 `ReconnectWebSocket` / `WaitForWebSocket`。 |
+| `src/utils/wails_runtime.js` | Wails Runtime Web 替代：事件→WebSocket、剪贴板→`navigator.clipboard`（含权限拒绝抛错）、窗口管理→no-op、`Environment()` 返回 `platform: 'web'`。导出 `ReconnectWebSocket` / `WaitForWebSocket`。 |
 | `src/utils/websocket.js` | WebSocket 客户端：自动重连（3 秒间隔）、事件监听/分发（`Map<event, Set<callback>>`）、`waitForWebSocket()` Promise、`reconnectWebSocket()` 强制重连。协议自动检测（`ws:`/`wss:`）。 |
 | `src/components/LoginPage.vue` | 登录页面：10 语言自动检测（内置翻译字典）、NaiveUI 组件、版本号动态获取、移动端响应式。 |
 | `src/components/icons/Logout.vue` | 退出登录 SVG 图标（48x48 viewBox，`stroke="currentColor"`）。 |
@@ -379,9 +386,9 @@ FROM golang:1.24-alpine AS backend-builder
 # 复制 go.mod + 源码 + 前端 dist
 # go mod tidy → go build -tags web → 产出 tinyrdm 单二进制
 
-# 阶段 3：运行时（Alpine 3.21，约 30MB）
+# 阶段 3：运行时（Alpine 3.21 + Noto 字体）
 FROM alpine:3.21
-# 仅包含 tinyrdm 二进制 + entrypoint.sh
+# 包含 tinyrdm 二进制 + entrypoint.sh + Noto 字体（支持字体选择列表）
 ```
 
 ### 关键构建参数
@@ -427,6 +434,12 @@ FROM alpine:3.21
 - 产物：`TinyRDM_Portable_*.zip`（便携版）+ `TinyRDM_Setup_*.exe`（NSIS 安装版，已签名）
 - 时间戳服务器：`http://timestamp.digicert.com`
 
+#### 相比原版 v1.2.6 的修复（3 处）
+
+1. **新增 "Add NSIS to PATH" 步骤** — chocolatey 安装 NSIS 后，全局写入 `$env:GITHUB_PATH`，修复 `makensis not found` 导致 Wails 静默跳过安装包生成的 bug（原版 v1.2.6 和 v1.2.5 均未加此步骤，v1.2.5 能用是因为当时 GitHub runner 镜像 NSIS 自动在 PATH，后来 runner 更新后不再自动加入）
+2. **签名步骤替换** — 原版使用 `dlemstra/code-sign-action@v1` + `WIN_SIGNING_CERT` secret（付费证书），改为 `New-SelfSignedCertificate` 自签名 + 检测 `*-installer.exe` 是否真正生成
+3. **Rename 步骤修正** — 原版 `Rename-Item -Path "Tiny RDM.exe"`（实际是 portable exe），改为 `Get-ChildItem -Filter "*-installer.exe"` 动态查找 NSIS 真正输出的 installer，带错误处理
+
 ---
 
 ## 安全特性
@@ -460,7 +473,7 @@ FROM alpine:3.21
 
 ### HTTP 安全响应头
 
-`X-Content-Type-Options: nosniff`、`X-Frame-Options: SAMEORIGIN`、`X-XSS-Protection: 1; mode=block`、`Referrer-Policy: strict-origin-when-cross-origin`、`Content-Security-Policy`
+`X-Content-Type-Options: nosniff`、`X-Frame-Options: SAMEORIGIN`、`X-XSS-Protection: 1; mode=block`、`Referrer-Policy: strict-origin-when-cross-origin`、`Content-Security-Policy`（`script-src` 和 `connect-src` 白名单包含 `https://static.cloudflareinsights.com` 和 `https://analytics.tinycraft.cc`，仅允许这两个特定域名）
 
 ---
 
@@ -513,6 +526,8 @@ FROM alpine:3.21
 | 退出登录按钮 | ❌ 无 | ✅ 侧边栏底部 |
 | 移动端适配 | ❌ 不适用 | ✅ 动态 viewport |
 | Favicon | ❌ 无 | ✅ |
+| 刷新拦截 | ❌ 不需要 | ✅ 拦截 F5/Ctrl+R/Cmd+R 防止丢失状态 |
+| 字体列表 | ✅ 系统字体 | ✅ Noto 字体（Docker 内置） |
 | Google Analytics | ✅ 启用 | ❌ 禁用 |
 | CORS/CSRF 防护 | ❌ 不需要 | ✅ |
 
@@ -520,7 +535,7 @@ FROM alpine:3.21
 
 ## 完整文件清单
 
-### 修改的原始文件（30 个）
+### 修改的原始文件（33 个）
 
 | 文件 | 改动说明 | 改动量 |
 |---|---|---|
@@ -536,14 +551,17 @@ FROM alpine:3.21
 | `backend/services/system_service.go` | 同上 | ~3 处 |
 | `backend/storage/local_storage.go` | 文件权限 `0777` → `0600`/`0700`（安全加固） | 2 处 |
 | `frontend/vite.config.js` | 条件别名 + proxy | +30 行 |
-| `frontend/src/App.vue` | 认证门控 + viewport + 双模式分离 | 重写 |
+| `frontend/src/App.vue` | 认证门控 + viewport + 双模式分离 + 拦截 F5/Ctrl+R 刷新 | 重写 |
 | `frontend/src/AppContent.vue` | 隐藏窗口按钮 + `isWeb()` + `100dvh` | +10 行 |
 | `frontend/src/components/sidebar/Ribbon.vue` | 退出登录按钮 | +15 行 |
 | `frontend/src/utils/platform.js` | 新增 `isWeb()` | +3 行 |
 | `frontend/src/assets/styles/style.scss` | `overscroll-behavior: none` + `height: 100dvh` | +2 行 |
 | `frontend/src/components/content_value/ContentCli.vue` | `WaitForWebSocket` 动态导入 | +15 行 |
 | `frontend/src/stores/connections.js` | 修复取消操作误显示成功 | 2 处 |
+| `frontend/src/utils/analytics.js` | `loadModule` 加 try-catch 防 CSP 阻断，`trackEvent` 检查 `typeof umami` | +5 行 |
+| `frontend/src/components/dialogs/AboutDialog.vue` | 版权年份 2025 → 2026 | 1 处 |
 | `frontend/index.html` | favicon | +1 行 |
+| `frontend/src/main.js` | Web 模式跳过 `loadPreferences()`（App.vue 认证后处理） | +3 行 |
 | `frontend/src/langs/*.json`（10 个语言文件） | 每个文件新增 `"logout"` 翻译键 | 每文件 +1 行 |
 
 ### 新增文件（27 个）
@@ -555,7 +573,7 @@ FROM alpine:3.21
 | `backend/services/platform_web.go` | 110 | Web 平台抽象，`//go:build web` |
 | `backend/services/connection_service_web.go` | 95 | Web 专用连接导入导出，`//go:build web` |
 | `backend/api/router.go` | 165 | Gin 路由器，`//go:build web` |
-| `backend/api/auth.go` | 260 | 登录认证，`//go:build web` |
+| `backend/api/auth.go` | 260 | 登录认证（HMAC Token、限速器、安全中间件、CSP 白名单），`//go:build web` |
 | `backend/api/websocket_hub.go` | 120 | WebSocket 连接池，`//go:build web` |
 | `backend/api/connection_api.go` | 170 | 连接 API，`//go:build web` |
 | `backend/api/browser_api.go` | ~600 | 数据浏览 API，`//go:build web` |
@@ -565,9 +583,9 @@ FROM alpine:3.21
 | `backend/api/preferences_api.go` | 55 | 偏好设置 API，`//go:build web` |
 | `backend/api/system_api.go` | 120 | 系统 API，`//go:build web` |
 | `frontend/src/utils/api.js` | ~420 | HTTP API 适配器 |
-| `frontend/src/utils/wails_runtime.js` | 80 | Wails Runtime 替代 |
+| `frontend/src/utils/wails_runtime.js` | 80 | Wails Runtime 替代（WebSocket 延迟连接，登录后才建立） |
 | `frontend/src/utils/websocket.js` | 110 | WebSocket 客户端 |
-| `frontend/src/components/LoginPage.vue` | 200 | 登录页面 |
+| `frontend/src/components/LoginPage.vue` | 200 | 登录页面（含主题/语言选择器、10 语言内置翻译） |
 | `frontend/src/components/icons/Logout.vue` | 35 | 退出图标 |
 | `frontend/public/favicon.png` | — | 浏览器图标 |
 | `DOCKER_WEB.md` | ~470 | 本文档 |
@@ -576,7 +594,7 @@ FROM alpine:3.21
 | `docker/entrypoint.sh` | 10 | 入口脚本 |
 | `.dockerignore` | 10 | 构建排除 |
 | `.github/workflows/docker-publish.yml` | 45 | Docker 镜像发布 |
-| `.github/workflows/release-windows.yaml` | 120 | Windows 桌面发布 |
+| `.github/workflows/release-windows.yaml` | 120 | Windows 桌面发布（修复 NSIS PATH + 自签名 + installer 检测） |
 
 ### 删除的原始文件（1 个）
 

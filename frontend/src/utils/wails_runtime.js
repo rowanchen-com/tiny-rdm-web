@@ -36,7 +36,9 @@ export async function ClipboardGetText() {
     try {
         return await navigator.clipboard.readText()
     } catch {
-        return ''
+        // clipboard.readText() requires HTTPS + user permission grant
+        // Throw so callers can show a meaningful error instead of silent empty string
+        throw new Error('clipboard permission denied')
     }
 }
 

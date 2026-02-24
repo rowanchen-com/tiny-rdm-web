@@ -35,7 +35,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -tags web -ldflags "-s -w -X main.version=
 # ============================================================
 FROM alpine:3.21
 
-RUN apk add --no-cache ca-certificates tzdata
+RUN apk add --no-cache ca-certificates tzdata fontconfig font-noto font-noto-cjk
 
 WORKDIR /app
 COPY --from=backend-builder /app/tinyrdm .
