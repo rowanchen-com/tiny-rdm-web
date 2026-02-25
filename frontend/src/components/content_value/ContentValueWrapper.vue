@@ -8,7 +8,7 @@ import ContentValueZset from '@/components/content_value/ContentValueZSet.vue'
 import ContentValueStream from '@/components/content_value/ContentValueStream.vue'
 import { useThemeVars } from 'naive-ui'
 import useBrowserStore from 'stores/browser.js'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { isEmpty } from 'lodash'
 import useDialogStore from 'stores/dialog.js'
 import { useI18n } from 'vue-i18n'
@@ -16,10 +16,6 @@ import ContentToolbar from '@/components/content_value/ContentToolbar.vue'
 import ContentValueJson from '@/components/content_value/ContentValueJson.vue'
 import usePreferencesStore from 'stores/preferences.js'
 import { TextAlignType } from '@/consts/text_align_type.js'
-import { isMacOS } from '@/utils/platform.js'
-import { isWeb } from '@/utils/platform.js'
-import useTabStore from 'stores/tab.js'
-import { BrowserTabType } from '@/consts/browser_tab_type.js'
 
 const themeVars = useThemeVars()
 const browserStore = useBrowserStore()
@@ -134,20 +130,9 @@ const onReload = async (selDecode, selFormat) => {
 }
 
 const onKeyShortcut = (e) => {
-    const isCtrlOn = isMacOS() ? e.metaKey : e.ctrlKey
     switch (e.key) {
         case 'Delete':
             onDelete()
-            return
-        case 'F5':
-            e.preventDefault()
-            onReload()
-            return
-        case 'r':
-            if (isCtrlOn) {
-                e.preventDefault()
-                onReload()
-            }
             return
         case 'F2':
             onRename()
@@ -209,29 +194,7 @@ const initContent = async () => {
 onMounted(() => {
     // onReload()
     initContent()
-    if (isWeb()) {
-        window.addEventListener('keydown', onPreventBrowserRefresh)
-    }
 })
-
-onUnmounted(() => {
-    if (isWeb()) {
-        window.removeEventListener('keydown', onPreventBrowserRefresh)
-    }
-})
-
-// Web mode: only intercept browser refresh when key detail tab is active
-const tabStore2 = useTabStore()
-const onPreventBrowserRefresh = (e) => {
-    if (tabStore2.nav !== 'browser') return
-    const { subTab } = tabStore2.currentTab || {}
-    if (subTab !== BrowserTabType.KeyDetail.toString()) return
-
-    const isCtrlOn = isMacOS() ? e.metaKey : e.ctrlKey
-    if (e.key === 'F5' || (isCtrlOn && e.key === 'r')) {
-        e.preventDefault()
-    }
-}
 
 watch(() => data.value?.keyPath, initContent)
 </script>
