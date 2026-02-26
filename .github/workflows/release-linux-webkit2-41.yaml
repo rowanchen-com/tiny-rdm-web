@@ -126,6 +126,15 @@ jobs:
         working-directory: ./build/linux
         run: mv "tiny-rdm_${{ steps.normalise_version.outputs.version }}_amd64.deb" "tiny-rdm_${{ steps.normalise_version.outputs.version }}_${{ steps.normalise_platform.outputs.tag }}_webkit2_41.deb"
 
+      - name: Delete existing release assets if re-running
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="v${{ steps.normalise_version.outputs.version }}"
+          asset="tiny-rdm_${{ steps.normalise_version.outputs.version }}_${{ steps.normalise_platform.outputs.tag }}_webkit2_41.deb"
+          gh release delete-asset "$tag" "$asset" -y 2>/dev/null || true
+
       - name: Upload release asset
         uses: softprops/action-gh-release@v1
         with:

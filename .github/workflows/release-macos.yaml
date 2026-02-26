@@ -124,6 +124,15 @@ jobs:
         working-directory: ./build/bin
         run: mv "TinyRDM-${{ steps.normalise_platform.outputs.tag }}.dmg" "TinyRDM_${{ steps.normalise_version.outputs.version }}_${{ steps.normalise_platform.outputs.tag }}.dmg"
 
+      - name: Delete existing release assets if re-running
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="v${{ steps.normalise_version.outputs.version }}"
+          asset="TinyRDM_${{ steps.normalise_version.outputs.version }}_${{ steps.normalise_platform.outputs.tag }}.dmg"
+          gh release delete-asset "$tag" "$asset" -y 2>/dev/null || true
+
       - name: Upload release asset (DMG Package)
         uses: softprops/action-gh-release@v1
         with:

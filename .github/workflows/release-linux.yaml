@@ -167,6 +167,18 @@ jobs:
       - name: Rename appimage
         run: mv Tiny_RDM-${{ steps.normalise_platform_arch.outputs.arch }}.AppImage "tiny-rdm_${{ steps.normalise_version.outputs.version }}_${{ steps.normalise_platform.outputs.tag }}.AppImage"
 
+      - name: Delete existing release assets if re-running
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="v${{ steps.normalise_version.outputs.version }}"
+          for asset in \
+            "tiny-rdm_${{ steps.normalise_version.outputs.version }}_${{ steps.normalise_platform.outputs.tag }}.deb" \
+            "tiny-rdm_${{ steps.normalise_version.outputs.version }}_${{ steps.normalise_platform.outputs.tag }}.AppImage"; do
+            gh release delete-asset "$tag" "$asset" -y 2>/dev/null || true
+          done
+
       - name: Upload release asset
         uses: softprops/action-gh-release@v1
         with:
