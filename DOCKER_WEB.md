@@ -109,7 +109,10 @@ server {
 ├── .dockerignore                    ★
 ├── .github/workflows/
 │   ├── docker-publish.yml           ★ # Docker 镜像发布
-│   └── release-windows.yaml        ★ # Windows 桌面发布
+│   ├── release-windows.yaml           # +run-name +重跑删旧 +NSIS 修复
+│   ├── release-macos.yaml             # +run-name +重跑删旧
+│   ├── release-linux.yaml             # +run-name +重跑删旧
+│   └── release-linux-webkit2-41.yaml  # +run-name +重跑删旧
 ├── backend/
 │   ├── api/                         ★ # 全部 //go:build web（10 个文件）
 │   │   ├── router.go                  # Gin 路由器 + CORS/CSRF + 静态文件
@@ -203,19 +206,28 @@ services.EventsEmit(s.ctx, "event_name", data)
 
 ### Docker 镜像发布（`docker-publish.yml`）
 
-- 触发：`release published` + 手动 `workflow_dispatch`
+- 触发：`release published` + 手动 `workflow_dispatch`（支持输入版本号）
 - 仓库：`ghcr.io/rowanchen-com/tiny-rdm-web`
 - 标签：语义化版本 + `latest`
+- `run-name`：统一显示版本号
 
 ### Windows 桌面发布（`release-windows.yaml`）
 
 - 触发：`release published` + 手动 `workflow_dispatch`
 - 产物：便携版 `.zip` + NSIS 安装版 `.exe`
+- `run-name`：统一显示版本号
+- 重跑支持：上传前自动删除已有同名 asset，无需手动删 release/tag
 
-相比原版 v1.2.6 修复 3 处：
+### macOS / Linux 桌面发布
+
+- 同样支持 `run-name` 统一显示版本号 + 重跑自动删除旧 asset
+
+相比原版 v1.2.6 修复 3 处 + 新增 2 项改进：
 1. 新增 "Add NSIS to PATH" 步骤 — 修复 `makensis not found` 导致安装包未生成
 2. 签名替换 — 原版 `dlemstra/code-sign-action@v1`（付费证书）→ `New-SelfSignedCertificate` 自签名
 3. Installer 检测 — 原版硬编码文件名 → `Get-ChildItem -Filter "*-installer.exe"` 动态查找
+4. `run-name` — 手动触发时 workflow 列表显示版本号而非 workflow 名称
+5. 重跑支持 — 上传前 `gh release delete-asset` 删除同名文件，构建失败后可直接重跑
 
 ---
 
@@ -272,7 +284,7 @@ services.EventsEmit(s.ctx, "event_name", data)
 | 登录认证 | ❌ | ✅ 可选 |
 | 退出登录 | ❌ | ✅ 侧边栏底部 |
 | 移动端适配 | ❌ | ✅ 动态 viewport |
-| 键详情快捷键 | ✅ F5/Ctrl+R 刷新数据 | ✅ 同上（拦截浏览器默认刷新） |
+| 键详情快捷键 | ✅ F5/Ctrl+R 刷新数据 | ❌ 移除（F5 = 浏览器刷新） |
 | 字体列表 | ✅ 系统字体 | ✅ Noto 字体（Docker 内置） |
 | Google Analytics | ✅ 启用 | ❌ 禁用 |
 
@@ -280,7 +292,7 @@ services.EventsEmit(s.ctx, "event_name", data)
 
 ## 完整文件清单
 
-### 修改的原始文件（33 个）
+### 修改的原始文件（37 个）
 
 | 文件 | 改动说明 |
 |---|---|
@@ -298,7 +310,7 @@ services.EventsEmit(s.ctx, "event_name", data)
 | `frontend/src/App.vue` | 认证门控 + viewport + 双模式分离 |
 | `frontend/src/AppContent.vue` | 隐藏窗口按钮 + `100dvh` |
 | `frontend/src/components/sidebar/Ribbon.vue` | 退出登录按钮 |
-| `frontend/src/components/content_value/ContentValueWrapper.vue` | F5/Ctrl+R 加 `preventDefault()` |
+| `frontend/src/components/content_value/ContentValueWrapper.vue` | 移除 F5/Ctrl+R 快捷键（Web 端不拦截浏览器刷新） |
 | `frontend/src/components/content_value/ContentCli.vue` | `WaitForWebSocket` 动态导入 |
 | `frontend/src/components/dialogs/AboutDialog.vue` | 版权年份 → 2026 |
 | `frontend/src/utils/platform.js` | 新增 `isWeb()` |
@@ -308,8 +320,12 @@ services.EventsEmit(s.ctx, "event_name", data)
 | `frontend/src/main.js` | Web 模式跳过 `loadPreferences()` |
 | `frontend/index.html` | favicon |
 | `frontend/src/langs/*.json`（10 个） | 新增 `"logout"` 翻译键 |
+| `.github/workflows/release-windows.yaml` | `run-name` + 重跑自动删旧 asset + NSIS 修复 |
+| `.github/workflows/release-macos.yaml` | `run-name` + 重跑自动删旧 asset |
+| `.github/workflows/release-linux.yaml` | `run-name` + 重跑自动删旧 asset |
+| `.github/workflows/release-linux-webkit2-41.yaml` | `run-name` + 重跑自动删旧 asset |
 
-### 新增文件（27 个）
+### 新增文件（26 个）
 
 | 文件 | 说明 |
 |---|---|
@@ -337,8 +353,7 @@ services.EventsEmit(s.ctx, "event_name", data)
 | `docker-compose.yml` | 部署配置 |
 | `docker/entrypoint.sh` | 容器入口脚本 |
 | `.dockerignore` | 构建排除 |
-| `.github/workflows/docker-publish.yml` | Docker 镜像发布 |
-| `.github/workflows/release-windows.yaml` | Windows 桌面发布 |
+| `.github/workflows/docker-publish.yml` | Docker 镜像发布 + `run-name` + 手动触发版本号输入 |
 | `DOCKER_WEB.md` | 本文档 |
 
 ### 删除的原始文件（1 个）
